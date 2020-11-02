@@ -8,6 +8,6 @@ class MultipleVAE(nn.Module):
         self,xyvae=xyvae
         self.xvar=xyvae
         self.yvar=yvae
-    def forward(self, x,y):
+    def forward(self, x,y): 
         
 
