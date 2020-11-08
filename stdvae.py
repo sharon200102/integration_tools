@@ -12,6 +12,7 @@ class StandardVAE(nn.Module):
 
         :param activation_fn: A Pointer to the activation function that will be used between the layers.
         """
+
         super(StandardVAE, self).__init__()
         self.activation_fn = activation_fn
         reversed_layers_structure = reversed(
@@ -47,7 +48,7 @@ class StandardVAE(nn.Module):
         """
         std = torch.exp(0.5 * logvar)
         eps = torch.randn_like(std)
-        return mu + eps * std
+        return mu + (eps * std)
 
     def decode(self, z):
         """
@@ -55,11 +56,25 @@ class StandardVAE(nn.Module):
         :param z: the latent representation of the input which is the output of the reparameterize function.
         :return:
         """
-        for decoding_layer in self.decoding_layers:
-            z = self.activation_fn(decoding_layer(z))
-        return torch.sigmoid(z)
+        for layer_number,decoding_layer in enumerate(self.decoding_layers):
+            if layer_number < len(self.decoding_layers)-1:
+                z = self.activation_fn(decoding_layer(z))
+            else:
+                z = decoding_layer(z)
+        return z
 
     def forward(self, x):
         mu, logvar = self.encode(x.view(-1, len(x)))   # self.encode(x.view(-1, 784))
         z = self.reparameterize(mu, logvar)
-        return self.decode(z), z, mu, logvar
+        return [self.decode(z), z, mu, logvar]
+
+    def loss_function(self,*args,**kwargs):
+        recons = args[0]
+        input = args[1]
+        mu = args[2]
+        log_var = args[3]
+        kld_weight = kwargs.get('M_N',1)
+        recons_loss = F.mse_loss(recons, input)
+        kld_loss = torch.mean(-0.5 * torch.sum(1 + log_var - mu ** 2 - log_var.exp(), dim=1), dim=0)
+        loss = recons_loss + kld_weight * kld_loss
+        return {'loss': loss, 'Reconstruction_Loss':recons_loss, 'KLD':-kld_loss}
