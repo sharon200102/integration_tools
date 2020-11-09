@@ -15,8 +15,7 @@ class StandardVAE(nn.Module):
 
         super(StandardVAE, self).__init__()
         self.activation_fn = activation_fn
-        reversed_layers_structure = reversed(
-            layers_structure)  # the reversed list will form the structure of the decoder.
+        reversed_layers_structure = layers_structure[::-1]  # the reversed list will form the structure of the decoder.
         self.encoding_layers = nn.ModuleList(
             [nn.Linear(layers_structure[i], layers_structure[i + 1]) for i in range(0, len(layers_structure) - 2)])   # Don't create the last layer because it needs to be split.
 
