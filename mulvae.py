@@ -19,7 +19,7 @@ class MultipleVAE(nn.Module):
         def forward(self, x=None, y=None):
             if x is not None and y is not None:
                 return {'x': self.xvae(x), 'y': self.yvae(y), 'xy': self.xyvae(torch.cat([x, y], dim=1))}
-            elif x is not None
+            elif x is not None:
                 return {'x': self.xvae(x)}
             else:
                 return {'y': self.yvae(y)}
