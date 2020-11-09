@@ -28,7 +28,7 @@ class MultipleVAE(nn.Module):
     between the latent representation of the VAE's """
 
     def loss_function(self, forward_dict):
-        if forward_dict.get('x',None) is not None and forward_dict.get('y',None):
+        if forward_dict is not None:
             l_x = self.xvae.loss_function(*(forward_dict['x']))['loss']
             l_y = self.xvae.loss_function(*(forward_dict['y']))['loss']
             l_xy = self.xvae.loss_function(*(forward_dict['xy']))['loss']
