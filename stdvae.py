@@ -17,7 +17,8 @@ class StandardVAE(nn.Module):
         self.activation_fn = activation_fn
         reversed_layers_structure = layers_structure[::-1]  # the reversed list will form the structure of the decoder.
         self.encoding_layers = nn.ModuleList(
-            [nn.Linear(layers_structure[i], layers_structure[i + 1]) for i in range(0, len(layers_structure) - 2)])   # Don't create the last layer because it needs to be split.
+            [nn.Linear(layers_structure[i], layers_structure[i + 1]) for i in
+             range(0, len(layers_structure) - 2)])  # Don't create the last layer because it needs to be split.
 
         # Layers for the mean and the variance of the normal distribution.
 
@@ -35,8 +36,7 @@ class StandardVAE(nn.Module):
         """
         for encoding_layer in self.encoding_layers:
             x = self.activation_fn(encoding_layer(x))
-        return self.mu_layer(x),self.logvar_layer(x)
-
+        return self.mu_layer(x), self.logvar_layer(x)
 
     def reparameterize(self, mu, logvar):
         """
@@ -55,25 +55,25 @@ class StandardVAE(nn.Module):
         :param z: the latent representation of the input which is the output of the reparameterize function.
         :return:
         """
-        for layer_number,decoding_layer in enumerate(self.decoding_layers):
-            if layer_number < len(self.decoding_layers)-1:
+        for layer_number, decoding_layer in enumerate(self.decoding_layers):
+            if layer_number < len(self.decoding_layers) - 1:
                 z = self.activation_fn(decoding_layer(z))
             else:
                 z = decoding_layer(z)
         return z
 
-    def forward(self, x):
-        mu, logvar = self.encode(x)   # self.encode(x.view(-1, 784))
+    def forward(self, input):
+        mu, logvar = self.encode(input)  # self.encode(x.view(-1, 784))
         z = self.reparameterize(mu, logvar)
-        return [self.decode(z), z, mu, logvar]
+        return [self.decode(z), input, mu, logvar, z]
 
-    def loss_function(self,*args,**kwargs):
+    def loss_function(self, *args, **kwargs):
         recons = args[0]
         input = args[1]
         mu = args[2]
         log_var = args[3]
-        kld_weight = kwargs.get('M_N',1)
+        kld_weight = kwargs.get('M_N', 1)
         recons_loss = F.mse_loss(recons, input)
         kld_loss = torch.mean(-0.5 * torch.sum(1 + log_var - mu ** 2 - log_var.exp(), dim=1), dim=0)
         loss = recons_loss + kld_weight * kld_loss
-        return {'loss': loss, 'Reconstruction_Loss':recons_loss, 'KLD':-kld_loss}
+        return {'loss': loss, 'Reconstruction_Loss': recons_loss, 'KLD': -kld_loss}
