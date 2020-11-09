@@ -21,9 +21,9 @@ class MultipleVAE(nn.Module):
     between the latent representation of the VAE's """
 
     def loss_function(self, forward_dict):
-        l_x = self.xvae.loss_function(forward_dict['x'])['loss']
-        l_y = self.xvae.loss_function(forward_dict['y'])['loss']
-        l_xy = self.xvae.loss_function(forward_dict['xy'])['loss']
+        l_x = self.xvae.loss_function(*(forward_dict['x']))['loss']
+        l_y = self.xvae.loss_function(*(forward_dict['y']))['loss']
+        l_xy = self.xvae.loss_function(*(forward_dict['xy']))['loss']
         similarity_loss_x_y = F.mse_loss(forward_dict['x'][0], forward_dict['y'][0])
         similarity_loss_x_xy = F.mse_loss(forward_dict['x'][0], forward_dict['xy'][0])
         similarity_loss_y_xy = F.mse_loss(forward_dict['y'][0], forward_dict['xy'][0])
