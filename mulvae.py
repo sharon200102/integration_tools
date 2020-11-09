@@ -6,6 +6,7 @@ from torch.nn import functional as F
 
 class MultipleVAE(nn.Module):
     def __init__(self, xyvae, xvae, yvae):
+        super(MultipleVAE, self).__init__()
         """The model consists of three VAE's, one for every possible permutation of a sample (only x is given,
         only y is given, both are given) """
         self.xyvae = xyvae
