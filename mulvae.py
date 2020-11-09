@@ -16,13 +16,7 @@ class MultipleVAE(nn.Module):
         """Given a complete sample(x and y) forward all VAE's"""
 
     def forward(self, x, y):
-        def forward(self, x=None, y=None):
-            if x is not None and y is not None:
-                return {'x': self.xvae(x), 'y': self.yvae(y), 'xy': self.xyvae(torch.cat([x, y], dim=1))}
-            elif x is not None:
-                return {'x': self.xvae(x)}
-            else:
-                return {'y': self.yvae(y)}
+        return {'x': self.xvae(x), 'y': self.yvae(y), 'xy': self.xyvae(torch.cat([x, y], dim=1))}
 
     """we're trying to minimize two losses, the  reconstruction losses of all VAE's together with the differences 
     between the latent representation of the VAE's """
