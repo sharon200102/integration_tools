@@ -26,6 +26,6 @@ class MultipleVAE(nn.Module):
         l_y = self.xvae.loss_function(*(forward_dict['y']))['loss']
         l_xy = self.xvae.loss_function(*(forward_dict['xy']))['loss']
         similarity_loss_x_y = F.mse_loss(forward_dict['x'][4], forward_dict['y'][4])
-        similarity_loss_x_xy = F.mse_loss(forward_dict['x'][4], forward_dict['xy'][4])
-        similarity_loss_y_xy = F.mse_loss(forward_dict['y'][4], forward_dict['xy'][4])
+        similarity_loss_x_xy = F.mse_loss(forward_dict['x'][4], forward_dict['xy'][4],reduction='sum')
+        similarity_loss_y_xy = F.mse_loss(forward_dict['y'][4], forward_dict['xy'][4],reduction='sum')
         return l_x + l_y + l_xy + similarity_loss_x_xy + similarity_loss_x_y + similarity_loss_y_xy
