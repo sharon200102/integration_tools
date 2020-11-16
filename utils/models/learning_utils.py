@@ -6,16 +6,15 @@ def make_train_step(model, optimizer):
         # forward
         forward_dict = model(x, y)
         # Computes loss
-        loss = model.loss_function(forward_dict)
+        loss_dict = model.loss_function(forward_dict)
+        total_loss = loss_dict['total_loss']
         # Computes gradients
-        loss.backward()
+        total_loss.backward()
         # Updates parameters and zeroes gradients
         optimizer.step()
         optimizer.zero_grad()
         # Returns the loss
-        return loss.item()
+        return loss_dict
 
     # Returns the function that will be called inside the train loop
     return train_step
-
-

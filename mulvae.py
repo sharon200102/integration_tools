@@ -22,10 +22,14 @@ class MultipleVAE(nn.Module):
     between the latent representation of the VAE's """
 
     def loss_function(self, forward_dict):
-        l_x = self.xvae.loss_function(*(forward_dict['x']))['loss']
-        l_y = self.xvae.loss_function(*(forward_dict['y']))['loss']
-        l_xy = self.xvae.loss_function(*(forward_dict['xy']))['loss']
-        similarity_loss_x_y = F.mse_loss(forward_dict['x'][4], forward_dict['y'][4])
-        similarity_loss_x_xy = F.mse_loss(forward_dict['x'][4], forward_dict['xy'][4],reduction='sum')
-        similarity_loss_y_xy = F.mse_loss(forward_dict['y'][4], forward_dict['xy'][4],reduction='sum')
-        return l_x + l_y + l_xy + similarity_loss_x_xy + similarity_loss_x_y + similarity_loss_y_xy
+        loss_dict = {}
+        loss_dict['xvae_loss'] = self.xvae.loss_function(*(forward_dict['x']))
+        loss_dict['yvae_loss'] = self.xvae.loss_function(*(forward_dict['y']))
+        loss_dict['xyvae_loss'] = self.xvae.loss_function(*(forward_dict['xy']))
+        loss_dict['similarity_loss_x_y'] = F.mse_loss(forward_dict['x'][4], forward_dict['y'][4], reduction='sum')
+        loss_dict['similarity_loss_x_xy'] = F.mse_loss(forward_dict['x'][4], forward_dict['xy'][4], reduction='sum')
+        loss_dict['similarity_loss_y_xy'] = F.mse_loss(forward_dict['y'][4], forward_dict['xy'][4], reduction='sum')
+        loss_dict['total_loss'] = loss_dict['xvae_loss']['loss'] + loss_dict['yvae_loss']['loss'] + \
+                                  loss_dict['xyvae_loss']['loss'] + loss_dict['similarity_loss_x_y'] + loss_dict[
+                                      'similarity_loss_x_xy'] + loss_dict['similarity_loss_y_xy']
+        return loss_dict
