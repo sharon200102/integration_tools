@@ -5,7 +5,7 @@ from torch.nn import functional as F
 
 
 class StandardVAE(nn.Module):
-    def __init__(self, layers_structure, activation_fn):
+    def __init__(self, layers_structure, activation_fn, kld_coefficient=1):
         """
         :param layers_structure: An iterable which will form the structure of the encoder, As a result, the structure
         of the decoder will be symmetrical.
@@ -29,6 +29,7 @@ class StandardVAE(nn.Module):
         self.decoding_layers = nn.ModuleList(
             [nn.Linear(reversed_layers_structure[i], reversed_layers_structure[i + 1]) for i in
              range(0, len(reversed_layers_structure) - 1)])
+        self.kld_coefficient = kld_coefficient
 
     def encode(self, x):
         """
@@ -67,12 +68,12 @@ class StandardVAE(nn.Module):
         z = self.reparameterize(mu, logvar)
         return [self.decode(z), input, mu, logvar, z]
 
-    def loss_function(self, *args, **kwargs):
+    def loss_function(self, *args, ):
         recons = args[0]
         input = args[1]
         mu = args[2]
         log_var = args[3]
-        kld_weight = kwargs.get('M_N', 1)
+        kld_weight = self.kld_coefficient
         recons_loss = F.mse_loss(recons, input)
         kld_loss = torch.mean(-0.5 * torch.sum(1 + log_var - mu ** 2 - log_var.exp(), dim=1), dim=0)
         loss = recons_loss + kld_weight * kld_loss
