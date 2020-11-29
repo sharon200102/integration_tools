@@ -18,3 +18,12 @@ def make_train_step(model, optimizer):
 
     # Returns the function that will be called inside the train loop
     return train_step
+
+
+def early_stopping(history, patience=2, ascending=True):
+    if len(history) <= patience:
+        return False
+    if ascending:
+        return history[-patience - 1] == max(history[-patience - 1:])
+    else:
+        return history[-patience - 1] == min(history[-patience - 1:])
