@@ -3,7 +3,7 @@ from setuptools import setup, find_packages
 
 HERE = pathlib.Path(__file__).parent
 
-VERSION = '0.1.0'
+VERSION = '0.1.3'
 PACKAGE_NAME = 'integration_tools'
 AUTHOR = 'Sharon Komissarov'
 AUTHOR_EMAIL = 'sharon200102@gmail.com'
@@ -17,10 +17,7 @@ LONG_DESC_TYPE = "text/markdown"
 INSTALL_REQUIRES = [
       'torch',
       'pandas',
-      'pickle',
-      'itertools',
       'typing',
-      'os',
       'argparse'
       
 ]
