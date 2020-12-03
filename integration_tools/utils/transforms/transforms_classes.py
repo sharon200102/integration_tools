@@ -1,5 +1,5 @@
 import torch
-from Projects.GDM.code.data_classes import patient_samples_single_tp
+from utils.data.data_classes import patient_samples_single_tp
 
 
 class ToTensor(object):

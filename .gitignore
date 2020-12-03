@@ -2,4 +2,6 @@
  *.pyc
  /.__pycache__
 venv/
-
+dist
+build
+integration_tools.egg-info

@@ -8,7 +8,7 @@ from utils.models.learning_utils import make_train_step, early_stopping
 import os
 import pandas as pd
 
-
+# Global variables which translate the names into the corresponding functions and objects
 activation_fn_dict = {'tanh': torch.nn.Tanh, 'relu': torch.nn.ReLU, 'sigmoid': torch.nn.Sigmoid,
                       'leaky relu': torch.nn.LeakyReLU}
 optimizers_dict = {'adam': torch.optim.Adam, 'Adadelta': torch.optim.Adadelta, 'Adagrad': torch.optim.adagrad}
@@ -16,6 +16,12 @@ optimizers_dict = {'adam': torch.optim.Adam, 'Adadelta': torch.optim.Adadelta, '
 
 class Data_inegrator:
     def __init__(self, parse_args):
+        """
+        The idea of this classs, is to transform the inputs inserted by the user into a data integration tool. The
+        Data_inegrator will iterate over all different configurations and exploit the best one to project the data
+        into its latent representation.
+        :param parse_args: which can be achieved by using the parser module in the parser package.
+        """
         with open(parse_args.data_path, 'rb') as data_file:
             self.patients_dataset = pickle.load(data_file)
         self.results_path = parse_args.results_path
@@ -56,6 +62,11 @@ class Data_inegrator:
         self.configuration_list = self._create_all_configurations()
 
     def _create_all_configurations(self) -> List[dict]:
+        """
+        Create all possible combinations of (learning_rate.latent_layer_size,klb_coefficient) that can be extracted
+        from the user's input
+        :return: A list of configurations, where each one is represented by a dictionary.
+        """
         parameters_list = itertools.product(self.learning_rate_list, self.latent_layer_size_list,
                                             self.klb_coefficient_list)
         configuration_list = [

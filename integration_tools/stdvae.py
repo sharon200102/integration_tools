@@ -64,11 +64,22 @@ class StandardVAE(nn.Module):
         return z
 
     def forward(self, input):
+        """
+
+        :param input: The input to the first layer.
+        :return: List which consists of, the reconstructed input,
+        the input itself, the mu and the sigma constructing the distribution from which the output was sampled,
+        and the latent representation of the input.
+        """
         mu, logvar = self.encode(input)  # self.encode(x.view(-1, 784))
         z = self.reparameterize(mu, logvar)
         return [self.decode(z), input, mu, logvar, z]
 
-    def loss_function(self, *args, ):
+    def loss_function(self, *args):
+        """
+        A function the given the forward array of a sample, calculates the loss. :param args: Forwrad array :return:
+        A dictionary which describes ever component of the loss i.e Reconstruction_Loss, KLD loss, and the total loss.
+        """
         recons = args[0]
         input = args[1]
         mu = args[2]

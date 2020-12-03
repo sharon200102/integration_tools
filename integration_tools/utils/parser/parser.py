@@ -6,9 +6,9 @@ from typing import List, Any
 def parse_parameters(parser: argparse.ArgumentParser):
     supported_activation_fn = ['tanh', 'relu', 'sigmoid', 'leaky relu']
     supported_optimizers = ['adam', 'Adadelta', 'Adagrad']
-    parser.add_argument("data_path", type=file_path, help="The path to the data object which contains the ")
+    parser.add_argument("data_path", type=_file_path, help="The path to the data object which contains the ")
 
-    parser.add_argument("results_path", type=dir_path, help="The path to the folder in which the results should be "
+    parser.add_argument("results_path", type=_dir_path, help="The path to the folder in which the results should be "
                                                             "placed", default=os.getcwd())
 
     parser.add_argument('-xy', '--xy_architecture', nargs='+', help='The architecture of the xy vae', type=int)
@@ -17,7 +17,7 @@ def parse_parameters(parser: argparse.ArgumentParser):
     parser.add_argument('-t', '--train_size', type=float, help='The percentage of the train out of the whole data ',
                         default=0.8)
     parser.add_argument('-b', '--batch_size', type=int, help='The batch size of the train loader ', default=10)
-    parser.add_argument('-l', '--learning_rate', type=float_iterator,
+    parser.add_argument('-l', '--learning_rate', type=_float_iterator,
                         help='The learning rate for the vae architecture ',
                         default=[0.01])
     parser.add_argument('-a', '--activation_fn', type=str, help='The activation function that will be applied after '
@@ -26,34 +26,34 @@ def parse_parameters(parser: argparse.ArgumentParser):
     parser.add_argument('-o', '--optimizer', type=str, help='The optimizer that will be used during the training '
                                                             'process', default='adam', choices=supported_optimizers)
 
-    parser.add_argument('-klb', '--klb_coefficient', type=float_iterator, help='The klb coefficient of the loss '
+    parser.add_argument('-klb', '--klb_coefficient', type=_float_iterator, help='The klb coefficient of the loss '
                                                                                'function for '
                                                                                'each of the vaes', default=[1.0])
-
+    
     parser.add_argument('-p', '--patience', type=int, help='The number of epochs until halting the training process '
                                                            'when there is no improvement on the validation loss',
                         default=5)
-    parser.add_argument('-la', '--latent_representation', type=int_iterator, help='Projection desired dimension',
+    parser.add_argument('-la', '--latent_representation', type=_int_iterator, help='Projection desired dimension',
                         default=[10])
 
     return parser.parse_args()
 
 
-def file_path(string):
+def _file_path(string):
     if os.path.isfile(string):
         return string
     else:
         raise NotADirectoryError(string)
 
 
-def dir_path(string):
+def _dir_path(string):
     if os.path.isdir(string):
         return string
     else:
         raise NotADirectoryError(string)
 
 
-def float_iterator(string: str) -> List[Any]:
+def _float_iterator(string: str) -> List[Any]:
     try:
         float(string)
         return [float(string)]
@@ -70,7 +70,7 @@ def float_iterator(string: str) -> List[Any]:
             return frang(int(start), int(end), int(jump), int(divide))
 
 
-def int_iterator(string: str) -> List[Any]:
+def _int_iterator(string: str) -> List[Any]:
     try:
         int(string)
         return [int(string)]
