@@ -2,22 +2,22 @@ import itertools
 from typing import List, Any
 import torch
 import pickle
-from stdvae import StandardVAE
-from mulvae import MultipleVAE
-from utils.models.learning_utils import make_train_step, early_stopping
+from .stdvae import StandardVAE
+from .mulvae import MultipleVAE
+from .utils.models.learning_utils import make_train_step, early_stopping
 import os
 import pandas as pd
 
 # Global variables which translate the names into the corresponding functions and objects
 activation_fn_dict = {'tanh': torch.nn.Tanh, 'relu': torch.nn.ReLU, 'sigmoid': torch.nn.Sigmoid,
                       'leaky relu': torch.nn.LeakyReLU}
-optimizers_dict = {'adam': torch.optim.Adam, 'Adadelta': torch.optim.Adadelta, 'Adagrad': torch.optim.adagrad}
+optimizers_dict = {'adam': torch.optim.Adam, 'Adadelta': torch.optim.Adadelta, 'Adagrad': torch.optim.Adagrad}
 
 
 class Data_inegrator:
     def __init__(self, parse_args):
         """
-        The idea of this classs, is to transform the inputs inserted by the user into a data integration tool. The
+        The idea of these classes, is to transform the inputs inserted by the user into a data integration tool. The
         Data_inegrator will iterate over all different configurations and exploit the best one to project the data
         into its latent representation.
         :param parse_args: which can be achieved by using the parser module in the parser package.
@@ -37,7 +37,7 @@ class Data_inegrator:
 
         # train and validate only according to the patients with both fields.
 
-        train_size = int(parse_args.train_size * self.xy_dataset)
+        train_size = int(parse_args.train_size * len(self.xy_dataset))
         validation_size = len(self.xy_dataset) - train_size
 
         # split the data into train and validation
@@ -54,7 +54,7 @@ class Data_inegrator:
 
         self.learning_rate_list = parse_args.learning_rate
         self.activation_fn = activation_fn_dict[parse_args.activation_fn]()
-        self.optimizer - optimizers_dict[parse_args.optimizer]
+        self.optimizer = optimizers_dict[parse_args.optimizer]
         self.latent_layer_size_list = parse_args.latent_representation
         self.klb_coefficient_list = parse_args.klb_coefficient
         self.patience = parse_args.patience
@@ -112,37 +112,70 @@ class Data_inegrator:
 
                 epoch += 1
                 # Do an epoch on the training set.
+
                 for patient_train_batch in self.xy_train_dataloader:
                     field0_batch, field1_batch = patient_train_batch['FIELD0'], patient_train_batch['FIELD1']
-                    train_step_function(field0_batch, field1_batch)
+                    # If for some reason the batch has mor dimensions than expected, squeeze it.
+                    if len(field0_batch.shape) > 2:
+                        field0_batch, field1_batch = patient_train_batch['FIELD0'].squeeze(), patient_train_batch[
+                            'FIELD1'].squeeze()
 
+                    train_step_function(field0_batch, field1_batch)
                 # Do validation
                 total_validation_loss_per_epoch = 0
                 with torch.no_grad():
                     full_vae.eval()
                     for validation_patient_batch in self.xy_validation_dataloader:
-                        field0_batch, field1_batch = validation_patient_batch['FIELD0'], validation_patient_batch[
-                            'FIELD1']
+                        field0_batch, field1_batch = validation_patient_batch['FIELD0'].squeeze(), \
+                                                     validation_patient_batch[
+                                                         'FIELD1'].squeeze()
                         forward_dict = full_vae(field0_batch, field1_batch)
                         # Computes reconstruction loss and according to it decide whether to stop.
                         loss_dict = full_vae.loss_function(forward_dict)
-                        total_validation_loss_per_epoch += loss_dict['xvae_loss']['Reconstruction_Loss'] + \
-                                                           loss_dict['xyvae_loss']['Reconstruction_Loss'] + \
-                                                           loss_dict['yvae_loss']['Reconstruction_Loss']
+                        total_validation_loss_per_epoch += float(loss_dict['xvae_loss']['Reconstruction_Loss'] + \
+                                                                 loss_dict['xyvae_loss']['Reconstruction_Loss'] + \
+                                                                 loss_dict['yvae_loss']['Reconstruction_Loss'])
                     # Compute the average validation sample loss.
                     average_validation_sample_loss = total_validation_loss_per_epoch / len(self.xy_validation_dataset)
                     # If the loss achieved on the validation is the smallest until so far, save the model.
                     if average_validation_sample_loss < best_model_loss:
                         torch.save(full_vae, os.path.join(self.results_path, 'best_model.pt'))
-                        best_model_loss = float(average_validation_sample_loss)
+                        best_model_loss = average_validation_sample_loss
                     # keep tracking of the validation loss in every epoch.
                     average_validation_sample_loss_per_epoch.append(average_validation_sample_loss)
-                    stop = early_stopping(average_validation_sample_loss_per_epoch, patience=self.patience, ascending=False)
+                    stop = early_stopping(average_validation_sample_loss_per_epoch, patience=self.patience,
+                                          ascending=False)
             configuration_best_result = min(average_validation_sample_loss_per_epoch)
             print('The model best loss achieved on the validation set is : {}  '.format(configuration_best_result))
-            best_results_of_each_configuration.append(configuration)
+            best_results_of_each_configuration.append(configuration_best_result)
 
         configuration_results_df = pd.DataFrame(self.configuration_list)
-        configuration_results_df=configuration_results_df.assign(best_loss=best_results_of_each_configuration)
-        configuration_results_df.to_csv(os.path.join(self.results_path,'models_results.csv'))
+        configuration_results_df = configuration_results_df.assign(best_loss=best_results_of_each_configuration)
+        configuration_results_df.to_csv(os.path.join(self.results_path, 'models_results.csv'))
 
+    def project_all_data(self):
+        latent_representation_list = []
+        patient_id_list = []
+        self.patients_dataset.dict_retrieval_flag = 0
+        full_vae = torch.load(os.path.join(self.results_path, 'best_model.pt'))
+
+        with torch.no_grad():
+            full_vae.eval()
+            for patient in self.patients_dataset:
+                if patient.get_status() == 0:
+                    field0, field1 = patient.field0, patient.field1
+                    try:
+                        latent_representation = full_vae.xyvae(torch.cat([field0, field1], dim=0))[4]
+                    except RuntimeError:
+                        latent_representation = full_vae.xyvae(torch.cat([field0, field1], dim=1))[4]
+
+                elif patient.get_status() == 1:
+                    field0 = patient.field0
+                    latent_representation = full_vae.xvae(field0)[4]
+                else:
+                    field1 = patient.field1
+                    latent_representation = full_vae.yvae(field1)[4]
+                latent_representation_list.append(latent_representation.squeeze().numpy())
+                patient_id_list.append(patient.id)
+            latent_representation_df = pd.DataFrame(data=latent_representation_list, index=patient_id_list)
+            latent_representation_df.to_csv(os.path.join(self.results_path, 'latent_representation.csv'))

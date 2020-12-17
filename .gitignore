@@ -5,3 +5,4 @@ venv/
 dist
 build
 integration_tools.egg-info
+.idea/
