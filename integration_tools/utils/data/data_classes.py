@@ -8,6 +8,8 @@ FIELD_ONE_ONLY = 2
 
 """A basic patient class"""
 """This object will compose the patient_dataset object"""
+
+
 class patient_samples_single_tp():
     def __init__(self, patient_dict):
         self.patient_dict = patient_dict
@@ -18,6 +20,7 @@ class patient_samples_single_tp():
 
     """The get_status function retrieves the fields status of the patient i.e whether all fields exists or otherwise 
     if one field is absent. """
+
     def get_status(self):
         # Both fields exist.
         if self.field0 is not None and self.field1 is not None:
@@ -27,7 +30,6 @@ class patient_samples_single_tp():
             return FIELD_ZERO_ONLY
         # field zero is absent
         return FIELD_ONE_ONLY
-
 
 
 class patient_dataset(Dataset):
@@ -99,10 +101,10 @@ class patient_dataset(Dataset):
 
                         if i == 1 and matching_field_one_tp is not None:
 
-                            matching_field_one_otu=specific_otu[
+                            matching_field_one_otu = specific_otu[
                                 (specific_mapping_table[patient_col_name] == patient_id) & (specific_mapping_table[
                                                                                                 tp_col_name] == matching_field_one_tp)]
-                            if len(matching_field_one_otu)>1:
+                            if len(matching_field_one_otu) > 1:
                                 print('hi')
 
                             patient_dict['FIELD1'] = matching_field_one_otu
@@ -113,6 +115,15 @@ class patient_dataset(Dataset):
                     patients_list.append(patient_samples_single_tp(patient_dict))
 
         self.patients = patients_list
+
+    @classmethod
+    def no_mapping(cls, source0, source1,**kwargs):
+        default_matching_name = 'id'
+        sources = [source0, source1]
+        sources_mapping = [pd.DataFrame(source.index.values, columns=[default_matching_name], index=source.index)
+                           for source in sources]
+        return cls(sources, sources_mapping, (default_matching_name, default_matching_name),
+                   (default_matching_name, default_matching_name),**kwargs)
 
     @staticmethod
     def _find_matches(first_field_list, second_field_list, matching_fn):
@@ -155,5 +166,3 @@ class patient_dataset(Dataset):
         indexes_of_patients_with_field2_only = [self.patients.index(patient) for patient in self.patients if
                                                 patient.get_status() == FIELD_ONE_ONLY]
         return indexes_of_patients_with_all_fields, indexes_of_patients_with_field1_only, indexes_of_patients_with_field2_only
-
-    
