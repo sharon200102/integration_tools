@@ -43,7 +43,7 @@ def _file_path(string):
     if os.path.isfile(string):
         return string
     else:
-        raise NotADirectoryError(string)
+        raise FileNotFoundError(string)
 
 
 def _dir_path(string):
