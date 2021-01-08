@@ -23,13 +23,13 @@ class Data_inegrator:
         :param parse_args: which can be achieved by using the parser module in the parser package.
         """
         with open(parse_args.data_path, 'rb') as data_file:
-            self.patients_dataset = pickle.load(data_file)
+            self.dual_entities_dataset = pickle.load(data_file)
         self.results_path = parse_args.results_path
         # find the patient which consists of both saliva and stool, and the patient without one of them.
-        indexes_of_patients_with_all_fields, indexes_of_patients_with_field0_only, indexes_of_patients_with_field1_only = self.patients_dataset.separate_to_groups()
-        self.xy_dataset = torch.utils.data.Subset(self.patients_dataset, indexes_of_patients_with_all_fields)
-        self.x_dataset = torch.utils.data.Subset(self.patients_dataset, indexes_of_patients_with_field0_only)
-        self.y_dataset = torch.utils.data.Subset(self.patients_dataset, indexes_of_patients_with_field1_only)
+        indexes_of_entities_with_all_fields, indexes_of_entities_with_field0_only, indexes_of_entities_with_field1_only = self.dual_entities_dataset.separate_to_groups()
+        self.xy_dataset = torch.utils.data.Subset(self.dual_entities_dataset, indexes_of_entities_with_all_fields)
+        self.x_dataset = torch.utils.data.Subset(self.dual_entities_dataset, indexes_of_entities_with_field0_only)
+        self.y_dataset = torch.utils.data.Subset(self.dual_entities_dataset, indexes_of_entities_with_field1_only)
 
         self.x_architecture = parse_args.x_architecture
         self.y_architecture = parse_args.y_architecture
@@ -113,11 +113,11 @@ class Data_inegrator:
                 epoch += 1
                 # Do an epoch on the training set.
 
-                for patient_train_batch in self.xy_train_dataloader:
-                    field0_batch, field1_batch = patient_train_batch['FIELD0'], patient_train_batch['FIELD1']
-                    # If for some reason the batch has mor dimensions than expected, squeeze it.
+                for entities_train_batch in self.xy_train_dataloader:
+                    field0_batch, field1_batch = entities_train_batch['FIELD0'], entities_train_batch['FIELD1']
+                    # If for some reason the batch has more dimensions than expected, squeeze it.
                     if len(field0_batch.shape) > 2:
-                        field0_batch, field1_batch = patient_train_batch['FIELD0'].squeeze(), patient_train_batch[
+                        field0_batch, field1_batch = entities_train_batch['FIELD0'].squeeze(), entities_train_batch[
                             'FIELD1'].squeeze()
 
                     train_step_function(field0_batch, field1_batch)
@@ -125,9 +125,9 @@ class Data_inegrator:
                 total_validation_loss_per_epoch = 0
                 with torch.no_grad():
                     full_vae.eval()
-                    for validation_patient_batch in self.xy_validation_dataloader:
-                        field0_batch, field1_batch = validation_patient_batch['FIELD0'].squeeze(), \
-                                                     validation_patient_batch[
+                    for entities_validation_batch in self.xy_validation_dataloader:
+                        field0_batch, field1_batch = entities_validation_batch['FIELD0'].squeeze(), \
+                                                     entities_validation_batch[
                                                          'FIELD1'].squeeze()
                         forward_dict = full_vae(field0_batch, field1_batch)
                         # Computes reconstruction loss and according to it decide whether to stop.
@@ -155,27 +155,31 @@ class Data_inegrator:
 
     def project_all_data(self):
         latent_representation_list = []
-        patient_id_list = []
-        self.patients_dataset.dict_retrieval_flag = 0
+        entities_id0_list = []
+        entities_id1_list = []
+        self.dual_entities_dataset.dict_retrieval_flag = 0
         full_vae = torch.load(os.path.join(self.results_path, 'best_model.pt'))
 
         with torch.no_grad():
             full_vae.eval()
-            for patient in self.patients_dataset:
-                if patient.get_status() == 0:
-                    field0, field1 = patient.field0, patient.field1
+            for entity in self.dual_entities_dataset:
+                entities_id0_list.append(entity.id0)
+                entities_id1_list.append(entity.id1)
+
+                if entity.get_status() == 0:
+                    field0, field1 = entity.field0, entity.field1
                     try:
                         latent_representation = full_vae.xyvae(torch.cat([field0, field1], dim=0))[4]
                     except RuntimeError:
                         latent_representation = full_vae.xyvae(torch.cat([field0, field1], dim=1))[4]
 
-                elif patient.get_status() == 1:
-                    field0 = patient.field0
+                elif entity.get_status() == 1:
+                    field0 = entity.field0
                     latent_representation = full_vae.xvae(field0)[4]
                 else:
-                    field1 = patient.field1
+                    field1 = entity.field1
                     latent_representation = full_vae.yvae(field1)[4]
                 latent_representation_list.append(latent_representation.squeeze().numpy())
-                patient_id_list.append(patient.id)
-            latent_representation_df = pd.DataFrame(data=latent_representation_list, index=patient_id_list)
+            latent_representation_df = pd.DataFrame(data=latent_representation_list)
+            latent_representation_df=latent_representation_df.assign(id0=entities_id0_list,id1=entities_id1_list)
             latent_representation_df.to_csv(os.path.join(self.results_path, 'latent_representation.csv'))

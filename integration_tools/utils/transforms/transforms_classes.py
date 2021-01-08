@@ -1,15 +1,15 @@
 import torch
-from ...utils.data.data_classes import patient_samples_single_tp
+from ...utils.data.data_classes import DualEntity
 
 
 class ToTensor(object):
     """Convert ndarrays in sample to Tensors."""
 
     def __call__(self, sample):
-        sample_dict_copy = dict(sample.patient_dict)
+        sample_dict_copy = dict(sample.entity_dict)
         if sample_dict_copy.get('FIELD0', None) is not None:
-            sample_dict_copy['FIELD0'] = torch.tensor(sample.patient_dict['FIELD0'].values.astype('float64')).type(torch.FloatTensor)
+            sample_dict_copy['FIELD0'] = torch.tensor(sample.entity_dict['FIELD0'].values.astype('float64')).type(torch.FloatTensor)
         if sample_dict_copy.get('FIELD1', None) is not None:
-            sample_dict_copy['FIELD1'] = torch.tensor(sample.patient_dict['FIELD1'].values.astype('float64')).type(torch.FloatTensor)
-        return patient_samples_single_tp(sample_dict_copy)
+            sample_dict_copy['FIELD1'] = torch.tensor(sample.entity_dict['FIELD1'].values.astype('float64')).type(torch.FloatTensor)
+        return DualEntity(sample_dict_copy)
 
