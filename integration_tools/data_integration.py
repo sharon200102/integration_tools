@@ -88,9 +88,9 @@ class Data_inegrator:
                     klb=klb_coefficient))
 
             # Construct the models according to the current configuration
-            xy_vae = StandardVAE(self.xy_architecture + [latent_layer_size], self.activation_fn)
-            x_vae = StandardVAE(self.x_architecture + [latent_layer_size], self.activation_fn)
-            y_vae = StandardVAE(self.y_architecture + [latent_layer_size], self.activation_fn)
+            xy_vae = StandardVAE(self.xy_architecture + [latent_layer_size], self.activation_fn,kld_coefficient=klb_coefficient)
+            x_vae = StandardVAE(self.x_architecture + [latent_layer_size], self.activation_fn,kld_coefficient=klb_coefficient)
+            y_vae = StandardVAE(self.y_architecture + [latent_layer_size], self.activation_fn,kld_coefficient=klb_coefficient)
             # Create the full VAE based on the standardVAE's above.
             full_vae = MultipleVAE(xy_vae, x_vae, y_vae)
             optimizer = self.optimizer(full_vae.parameters(), lr=learning_rate)
@@ -100,7 +100,6 @@ class Data_inegrator:
             average_validation_sample_loss_per_epoch = []
             epoch = 0
 
-            stopping_epoch = 0
 
             # Train full model.
 
@@ -146,7 +145,8 @@ class Data_inegrator:
                     stop = early_stopping(average_validation_sample_loss_per_epoch, patience=self.patience,
                                           ascending=False)
             configuration_best_result = min(average_validation_sample_loss_per_epoch)
-            print('The model best loss achieved on the validation set is : {}  '.format(configuration_best_result))
+            print('\nThe model best loss achieved on the validation set is : {}  '.format(configuration_best_result))
+            print('\nThe training stopped after {epochs} epochs'.format(epochs=epoch))
             best_results_of_each_configuration.append(configuration_best_result)
 
         configuration_results_df = pd.DataFrame(self.configuration_list)
