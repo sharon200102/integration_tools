@@ -17,7 +17,7 @@ def parse_parameters(parser: argparse.ArgumentParser):
     parser.add_argument('-t', '--train_size', type=float, help='The percentage of the train out of the whole data ',
                         default=0.8)
     parser.add_argument('-b', '--batch_size', type=int, help='The batch size of the train loader ', default=10)
-    parser.add_argument('-l', '--learning_rate', type=_float_iterator,
+    parser.add_argument('-l', '--learning_rate', type=_logarithmic_iterator,
                         help='The learning rate for the vae architecture ',
                         default=[0.01])
     parser.add_argument('-a', '--activation_fn', type=str, help='The activation function that will be applied after '
@@ -26,7 +26,7 @@ def parse_parameters(parser: argparse.ArgumentParser):
     parser.add_argument('-o', '--optimizer', type=str, help='The optimizer that will be used during the training '
                                                             'process', default='adam', choices=supported_optimizers)
 
-    parser.add_argument('-klb', '--klb_coefficient', type=_float_iterator, help='The klb coefficient of the loss '
+    parser.add_argument('-klb', '--klb_coefficient', type=_logarithmic_iterator, help='The klb coefficient of the loss '
                                                                                'function for '
                                                                                'each of the vaes', default=[1.0])
     
@@ -53,22 +53,17 @@ def _dir_path(string):
         raise NotADirectoryError(string)
 
 
-def _float_iterator(string: str) -> List[Any]:
+def _logarithmic_iterator(string: str) -> List[Any]:
     try:
         float(string)
         return [float(string)]
     except ValueError:
         split_frange = string.split(',')
-        if len(split_frange) == 2:
-            start, end = split_frange
-            return frang(int(start), int(end))
         if len(split_frange) == 3:
-            start, end, jump = split_frange
-            return frang(int(start), int(end), int(jump))
-        if len(split_frange) == 4:
-            start, end, jump, divide = split_frange
-            return frang(int(start), int(end), int(jump), int(divide))
-
+            start, end, factor = split_frange
+            return _logarithmic_scale(float(start), float(end), float(factor))
+        else:
+            raise ValueError('Could not interoperate the range inserted')
 
 def _int_iterator(string: str) -> List[Any]:
     try:
@@ -98,3 +93,8 @@ def frang(start: int, end: int, jump: int = 1, divide: int = 1, transform_to_int
         return list(map(lambda item: item / divide, range(start, end, jump)))
     else:
         return list(map(lambda item: int(item / divide), range(start, end, jump)))
+def _logarithmic_scale(start: float,end:float,factor:float):
+    import math
+    max_iterations = int(math.log(end/start,factor))
+    return [start*(factor**power) for power in range(max_iterations+1)]
+
