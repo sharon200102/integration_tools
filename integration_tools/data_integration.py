@@ -14,18 +14,19 @@ activation_fn_dict = {'tanh': torch.nn.Tanh, 'relu': torch.nn.ReLU, 'sigmoid': t
 optimizers_dict = {'adam': torch.optim.Adam, 'Adadelta': torch.optim.Adadelta, 'Adagrad': torch.optim.Adagrad}
 
 
-class Data_inegrator:
+class Data_integrator:
     def __init__(self, parse_args):
         """
         The idea of these classes, is to transform the inputs inserted by the user into a data integration tool. The
-        Data_inegrator will iterate over all different configurations and exploit the best one to project the data
+        Data_integrator will iterate over all different configurations and exploit the best one to project the data
         into its latent representation.
         :param parse_args: which can be achieved by using the parser module in the parser package.
         """
+        # Load the dual_dataset object which upon it the learning will be performed.
         with open(parse_args.data_path, 'rb') as data_file:
             self.dual_entities_dataset = pickle.load(data_file)
         self.results_path = parse_args.results_path
-        # find the patient which consists of both saliva and stool, and the patient without one of them.
+        # find the samples which consists of both entities, and the samples without one of them. Subset the data acorrdingly.
         indexes_of_entities_with_all_fields, indexes_of_entities_with_field0_only, indexes_of_entities_with_field1_only = self.dual_entities_dataset.separate_to_groups()
         self.xy_dataset = torch.utils.data.Subset(self.dual_entities_dataset, indexes_of_entities_with_all_fields)
         self.x_dataset = torch.utils.data.Subset(self.dual_entities_dataset, indexes_of_entities_with_field0_only)
@@ -51,7 +52,7 @@ class Data_inegrator:
         self.xy_validation_dataloader = torch.utils.data.DataLoader(self.xy_validation_dataset,
                                                                     batch_size=len(self.xy_validation_dataset),
                                                                     shuffle=True)
-
+        # load the rest of the learning parameters.
         self.learning_rate_list = parse_args.learning_rate
         self.activation_fn = activation_fn_dict[parse_args.activation_fn]()
         self.optimizer = optimizers_dict[parse_args.optimizer]
@@ -75,9 +76,13 @@ class Data_inegrator:
         return configuration_list
 
     def find_best_configuration(self):
+        """Train the architecture on each configuration with the training data and use reconstruction loss early stopping
+         on the validation set in order to halt the training."""
+
         best_results_of_each_configuration = []
         best_model_loss = 10 ** 10
         for configuration in self.configuration_list:
+            # pick a configuration
             learning_rate = configuration['learning_rate']
             latent_layer_size = configuration['latent_layer_size']
             klb_coefficient = configuration['klb_coefficient']
@@ -91,7 +96,7 @@ class Data_inegrator:
             xy_vae = StandardVAE(self.xy_architecture + [latent_layer_size], self.activation_fn,kld_coefficient=klb_coefficient)
             x_vae = StandardVAE(self.x_architecture + [latent_layer_size], self.activation_fn,kld_coefficient=klb_coefficient)
             y_vae = StandardVAE(self.y_architecture + [latent_layer_size], self.activation_fn,kld_coefficient=klb_coefficient)
-            # Create the full VAE based on the standardVAE's above.
+            # Create the full VAE based on the standard VAE's above.
             full_vae = MultipleVAE(xy_vae, x_vae, y_vae)
             optimizer = self.optimizer(full_vae.parameters(), lr=learning_rate)
             train_step_function = make_train_step(full_vae, optimizer)
@@ -144,42 +149,49 @@ class Data_inegrator:
                     average_validation_sample_loss_per_epoch.append(average_validation_sample_loss)
                     stop = early_stopping(average_validation_sample_loss_per_epoch, patience=self.patience,
                                           ascending=False)
+            # Save the best result of the configuration
             configuration_best_result = min(average_validation_sample_loss_per_epoch)
             print('\nThe model best loss achieved on the validation set is : {}  '.format(configuration_best_result))
             print('\nThe training stopped after {epochs} epochs'.format(epochs=epoch))
             best_results_of_each_configuration.append(configuration_best_result)
-
+        # Save the best results of all configurations into a dataframe.
         configuration_results_df = pd.DataFrame(self.configuration_list)
         configuration_results_df = configuration_results_df.assign(best_loss=best_results_of_each_configuration)
         configuration_results_df.to_csv(os.path.join(self.results_path, 'models_results.csv'))
 
     def project_all_data(self):
+        """ Exploit the model that produced the best results and project thw whole data accordingly."""
         latent_representation_list = []
         entities_id0_list = []
         entities_id1_list = []
+        # Force the dual_entities_dataset to retrieve the object and not its corresponding dict
         self.dual_entities_dataset.dict_retrieval_flag = 0
+        # Load the model which produced the best loss.
         full_vae = torch.load(os.path.join(self.results_path, 'best_model.pt'))
 
         with torch.no_grad():
             full_vae.eval()
+            # Iterate over all samples.
             for entity in self.dual_entities_dataset:
                 entities_id0_list.append(entity.id0)
                 entities_id1_list.append(entity.id1)
-
+                # if the entity consists of both X and Y use XYVAE
                 if entity.get_status() == 0:
                     field0, field1 = entity.field0, entity.field1
                     try:
                         latent_representation = full_vae.xyvae(torch.cat([field0, field1], dim=0))[4]
                     except RuntimeError:
                         latent_representation = full_vae.xyvae(torch.cat([field0, field1], dim=1))[4]
-
+                # if the entity consists only of X use  XVAE
                 elif entity.get_status() == 1:
                     field0 = entity.field0
                     latent_representation = full_vae.xvae(field0)[4]
+                # if the entity consists only of y use  YVAE
                 else:
                     field1 = entity.field1
                     latent_representation = full_vae.yvae(field1)[4]
                 latent_representation_list.append(latent_representation.squeeze().numpy())
+            # Save all projections into a dataframe.
             latent_representation_df = pd.DataFrame(data=latent_representation_list)
             latent_representation_df=latent_representation_df.assign(id0=entities_id0_list,id1=entities_id1_list)
             latent_representation_df.to_csv(os.path.join(self.results_path, 'latent_representation.csv'))
