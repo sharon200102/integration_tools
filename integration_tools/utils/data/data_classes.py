@@ -69,7 +69,7 @@ class DualDataset(Dataset):
                        matching_info_source1=None, matching_fn=None, separator: pd.Series = None):
 
         if separator is not None:  # If all sources are combined in one table (source0) and all matching info is combined in  matching_info_source0, then split by separator
-            if len(separator.unique() != 2):  # i.e the separator is not binary.
+            if len(separator.unique()) != 2:  # i.e the separator is not binary.
                 raise ValueError("Separator must be composed of two unique values only")
             else:
                 all_matching_info = matching_info_source0
