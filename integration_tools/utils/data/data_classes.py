@@ -1,6 +1,10 @@
 import pandas as pd
 from torch.utils.data import Dataset
 from collections.abc import Iterable
+import pytorch_lightning as pl
+import os
+import pickle
+import torch
 
 # Introducing some global variables indicating the state of a an entity ,
 # i.e consists of all fields, field zero only, field one only.
@@ -10,7 +14,6 @@ ALL_FIELDS = 0
 FIELD_ZERO_ONLY = 1
 FIELD_ONE_ONLY = 2
 
-
 """The concept of the whole package is to offer novel methods for integration of two datasets with partial overlap in samples.
 More specifically given two related data-sets  denoted by X and Y where each sample i can have either the X vector xi  
 the Y vector yi or both
@@ -18,6 +21,8 @@ The goal is to develop a machine learning architecture that will provide a laten
 Therefore, its necessary to create a data object in which every sample can consist of Xi or Yi or both. """
 
 """DualDataset provides exactly that, every sample (DualEntity) can consist Field0,Field1 or both. """
+
+
 class DualEntity():
     def __init__(self, entity_dict):
         self.entity_dict = entity_dict
@@ -42,6 +47,7 @@ class DualEntity():
 
 class DualDataset(Dataset):
     """The core of the object is an iterable of Dual_entities"""
+
     def __init__(self, dual_entities: Iterable, transform=None):
         """
 
@@ -52,13 +58,12 @@ class DualDataset(Dataset):
 
         """
         self.entities = dual_entities
-        self.transform=transform
+        self.transform = transform
         self.dict_retrieval_flag = 1
 
     @classmethod
-
     def from_sources(cls, source0: pd.DataFrame, source1: pd.DataFrame = None, matching_info_source0=None,
-                     matching_info_source1=None, matching_fn=None, separator: pd.Series = None,**kwargs):
+                     matching_info_source1=None, matching_fn=None, separator: pd.Series = None, **kwargs):
         """
         The core function in the class, this function is the main way to construct the DualDataset object, and its supports
          many different inputs.
@@ -112,7 +117,6 @@ class DualDataset(Dataset):
         return cls(dual_entities_list, **kwargs)
 
     @staticmethod
-
     def _adjust_inputs(source0: pd.DataFrame, source1: pd.DataFrame = None, matching_info_source0=None,
                        matching_info_source1=None, matching_fn=None, separator: pd.Series = None):
         """ The function executes the actions introduced in from_sources function"""
@@ -193,3 +197,71 @@ class DualDataset(Dataset):
         indexes_of_entities_with_field2_only = [self.entities.index(entity) for entity in self.entities if
                                                 entity.get_status() == FIELD_ONE_ONLY]
         return indexes_of_entities_with_all_fields, indexes_of_entities_with_field1_only, indexes_of_entities_with_field2_only
+
+
+class ConcatDataset(torch.utils.data.Dataset):
+    def __init__(self, *datasets):
+        self.datasets = datasets
+
+    def __getitem__(self, i):
+        return tuple(d[i] for d in self.datasets)
+
+    def __len__(self):
+        return min(len(d) for d in self.datasets)
+
+
+class DualDataModule(pl.LightningDataModule):
+    def __init__(self, data_path, train_batch_size=10, validation_batch_size=10, train_size=0.8):
+        super().__init__()
+        # Check if the given file path is valid
+        if os.path.isfile(data_path):
+            self.data_path = data_path
+            # Load the dual_dataset object which upon it the learning will be performed.
+            with open(self.data_path, 'rb') as data_file:
+                self.dual_entities_dataset = pickle.load(data_file)
+        # Not valid
+        else:
+            raise FileNotFoundError(data_path)
+
+        self.train_batch_size = train_batch_size
+        self.validation_batch_size = validation_batch_size
+        self.train_size = train_size
+
+    def setup(self, stage: str = None):
+        # find the samples which consists of both entities, and the samples without one of them. Subset the data
+        # acorrdingly.
+        indexes_of_entities_with_all_fields, indexes_of_entities_with_field0_only, indexes_of_entities_with_field1_only = self.dual_entities_dataset.separate_to_groups()
+
+        self.xy_dataset = torch.utils.data.Subset(self.dual_entities_dataset, indexes_of_entities_with_all_fields)
+        train_size = int(self.train_size * len(self.xy_dataset))
+        validation_size = len(self.xy_dataset) - train_size
+        # train and validate only according to the patients with both fields.
+
+        self.xy_train_dataset, self.xy_validation_dataset = torch.utils.data.random_split(self.xy_dataset,
+                                                                                          [train_size, validation_size])
+
+    def train_dataloader(self):
+        return torch.utils.data.DataLoader(self.xy_train_dataset, shuffle=True,
+                                           batch_size=self.train_batch_size)
+
+    def val_dataloader(self):
+        return torch.utils.data.DataLoader(self.xy_validation_dataset, batch_size=self.validation_batch_size,
+                                           shuffle=False)
+
+
+class ConcatDataModule(pl.LightningDataModule):
+    def __init__(self, data_path, batch_size: int = 10):
+        super().__init__()
+        self.data_path = data_path
+        self.batch_size = batch_size
+
+    def setup(self,stage: str = None):
+        if os.path.isfile(self.data_path):
+            with open(self.data_path, 'rb') as data_file:
+                self.concatds = pickle.load(data_file)
+        # Not valid
+        else:
+            raise FileNotFoundError(self.data_path)
+
+    def train_dataloader(self):
+        return torch.utils.data.DataLoader(self.concatds,self.batch_size,shuffle=True)

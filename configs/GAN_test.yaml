@@ -1,0 +1,26 @@
+core_params:
+  name: 'IntegrativeGAN'
+  xgenerator_architecture:
+  - 203
+  - 100
+  ygenerator_architecture:
+  - 68
+  discriminator_architecture:
+  - 25
+  latent_layer_size: 50
+
+tuned_params:
+  learning_rate:
+  - 0.0001
+  - 0.01
+  - 2
+
+
+data_params:
+  data_path: "/home/sharon200102/Documents/second degree/Research/integration_tools/tests/dataset/concatds"
+  batch_size: 10
+trainer_params:
+  patience: null
+
+logging_params:
+  save_dir: "../microbiome_projects/microbiome/Projects/BGU_fatty_liver/visualizations/visualization_after_lightning"

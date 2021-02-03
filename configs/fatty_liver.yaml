@@ -1,0 +1,35 @@
+core_params:
+  name: 'MultipleVAE'
+  xy_architecture:
+  - 271 
+  - 135
+  x_architecture:
+  - 203
+  y_architecture:
+  - 68
+tuned_params:
+  latent_layer_size:
+  - 10
+  - 50
+  - 10
+  klb_coefficient:
+  - 0.01
+  - 1
+  - 2
+  learning_rate:
+  - 0.0001
+  - 0.01
+  - 2
+  
+
+data_params:
+  data_path: "/home/sharon200102/Documents/second degree/Research/microbiome_projects/microbiome/Projects/BGU_fatty_liver/data/data_used/entities_datasets/entities"
+  train_batch_size: 10
+  validation_batch_size: 10
+  train_size: 0.8
+
+trainer_params:
+  patience: 5
+
+logging_params:
+  save_dir: "../microbiome_projects/microbiome/Projects/BGU_fatty_liver/visualizations/visualization_after_lightning"
