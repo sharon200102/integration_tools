@@ -21,13 +21,14 @@ class Generator(nn.Module):
 
         for i in range(0, len(layers_structure) - 1):
             if i == len(layers_structure) - 2:
+                # Do not use an activation function in the last layer
                 modules.extend(self.block(layers_structure[i], layers_structure[i + 1], activation=False))
             else:
                 modules.extend(self.block(layers_structure[i], layers_structure[i + 1]))
-        self.modules = nn.ModuleList(modules)
+        self.modules_list = nn.ModuleList(modules)
 
     def forward(self, x):
-        for module in self.modules:
+        for module in self.modules_list:
             x = module(x)
         return x
 
@@ -100,54 +101,53 @@ class IntegrativeGAN(pl.LightningModule):
 
     def training_step(self,batch,batch_idx,optimizer_idx):
         raw_samples,ground_truth_representation = batch
-        ground_truth_representation=ground_truth_representation[0]
         x, y = raw_samples['FIELD0'], raw_samples['FIELD1']
-        b_size = len(batch)
-        label = torch.full((b_size,), XY_LABELS, dtype=torch.float)
+        b_size = x.shape[0]
 
         # train the discriminator
         if optimizer_idx == 0:
+            real_latent_representation_label = torch.full((b_size,), XY_LABELS, dtype=torch.long)
             # Forward pass ground_truth batch through D
-            output = self.discriminator(ground_truth_representation)
-            err_ground_truth=self.adversarial_loss(output,label)
+            err_ground_truth=self.adversarial_loss(self.discriminator(ground_truth_representation),real_latent_representation_label)
 
             # Train discriminator to identify x_generated_representation from ground_truth
-            self.x_generated_representation=self.xgenerator(x)
-            label.fill_(X_LABELS)
-            output = self.discriminator(self.x_generated_representation.detach())
-
-            err_disc_x_generated_representation=self.adversarial_loss(output,label)
+            fake_x_label = torch.full((b_size,), X_LABELS, dtype=torch.long)
+            err_disc_x_generated_representation=self.adversarial_loss(self.discriminator(self.xgenerator(x).detach()),fake_x_label)
 
             # Train discriminator to identify y_generated_representation from ground_truth
-            self.y_generated_representation = self.ygenerator(y)
-            label.fill_(Y_LABELS)
-            output = self.discriminator(self.y_generated_representation.detach())
+            fake_y_label = torch.full((b_size,), Y_LABELS, dtype=torch.long)
+            err_disc_y_generated_representation = self.adversarial_loss(self.discriminator(self.ygenerator(y).detach()),fake_y_label)
 
-            err_disc_y_generated_representation = self.adversarial_loss(output, label)
-
-            errD = err_ground_truth + err_disc_x_generated_representation + err_disc_y_generated_representation
-            tqdm_dict = {'d_loss': errD}
-
-            return {'loss': errD,'progress_bar':tqdm_dict}
+            self.errD = err_ground_truth + err_disc_x_generated_representation + err_disc_y_generated_representation
+            self.log('discriminator_loss', self.errD, on_step=False, on_epoch=True, prog_bar=True, logger=True)
+            return {'loss': self.errD}
 
         # Train the X generator
         if optimizer_idx == 1:
-            label.fill_(XY_LABELS)
-            output = self.discriminator(self.x_generated_representation.detach())
-            err_gx = self.adversarial_loss(output,label)
-            err_gx.backward()
-            tqdm_dict = {'gx_loss': err_gx}
+            real_latent_representation_label = torch.full((b_size,), XY_LABELS, dtype=torch.long)
+            self.err_gx = self.adversarial_loss(self.discriminator(self.xgenerator(x)),real_latent_representation_label)
+            self.log('xgenerator_loss', self.err_gx, on_step=False, on_epoch=True, prog_bar=True, logger=True)
 
-            return {'loss': err_gx, 'progress_bar': tqdm_dict}
+            return {'loss': self.err_gx}
         # Train The Y generator
         if optimizer_idx == 2:
-            label.fill_(XY_LABELS)
-            output = self.discriminator(self.y_generated_representation.detach())
-            err_gy = self.adversarial_loss(output, label)
-            err_gy.backward()
-            tqdm_dict = {'gy_loss': err_gy}
+            real_latent_representation_label = torch.full((b_size,), XY_LABELS, dtype=torch.long)
+            self.err_gy = self.adversarial_loss(self.discriminator(self.ygenerator(y)), real_latent_representation_label)
+            self.log('ygenerator_loss', self.err_gy, on_step=False, on_epoch=True, prog_bar=True, logger=True)
+            self.log('total_loss',self.err_gx+self.err_gy, on_step=False, on_epoch=True, prog_bar=True, logger=True)
 
-            return {'loss': err_gy, 'progress_bar': tqdm_dict}
+            return {'loss': self.err_gy}
+
+    """
+    def training_epoch_end(self, outputs) -> None:
+        print(outputs)
+        discriminator_loss = torch.tensor([x['progress_bar']['discriminator_loss'] for x in outputs]).mean()
+        xgenerator_loss = torch.tensor([x['progress_bar']['xgenerator_loss'] for x in outputs]).mean()
+        ygenerator_loss = torch.tensor([x['progress_bar']['ygenerator_loss'] for x in outputs]).mean()
+        self.log('discriminator_loss',discriminator_loss,prog_bar=True)
+        self.log('xgenerator_loss',xgenerator_loss,prog_bar=True)
+        self.log('ygenerator_loss',ygenerator_loss,prog_bar=True)
+    """
 
     @classmethod
     def get_hyper_parameter_search_dict(cls):

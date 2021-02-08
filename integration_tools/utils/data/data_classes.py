@@ -189,6 +189,11 @@ class DualDataset(Dataset):
             retrieved_entity = self.transform(self.entities[idx])
         return retrieved_entity.entity_dict if self.dict_retrieval_flag else retrieved_entity
 
+    @classmethod
+    def subset(cls, full_data, indices: list, **kwargs):
+        subset_of_entities = [full_data.entities[subset_index] for subset_index in indices]
+        return cls(subset_of_entities, **kwargs)
+
     def separate_to_groups(self):
         indexes_of_entities_with_all_fields = [self.entities.index(entity) for entity in self.entities if
                                                entity.get_status() == ALL_FIELDS]
@@ -210,58 +215,35 @@ class ConcatDataset(torch.utils.data.Dataset):
         return min(len(d) for d in self.datasets)
 
 
-class DualDataModule(pl.LightningDataModule):
-    def __init__(self, data_path, train_batch_size=10, validation_batch_size=10, train_size=0.8):
+class TrainAndValidateDataModule(pl.LightningDataModule):
+    def __init__(self, data, train_batch_size=10, validation_batch_size=10, train_size=0.8):
         super().__init__()
-        # Check if the given file path is valid
-        if os.path.isfile(data_path):
-            self.data_path = data_path
-            # Load the dual_dataset object which upon it the learning will be performed.
-            with open(self.data_path, 'rb') as data_file:
-                self.dual_entities_dataset = pickle.load(data_file)
-        # Not valid
-        else:
-            raise FileNotFoundError(data_path)
-
+        self.data = data
         self.train_batch_size = train_batch_size
         self.validation_batch_size = validation_batch_size
         self.train_size = train_size
 
     def setup(self, stage: str = None):
-        # find the samples which consists of both entities, and the samples without one of them. Subset the data
-        # acorrdingly.
-        indexes_of_entities_with_all_fields, indexes_of_entities_with_field0_only, indexes_of_entities_with_field1_only = self.dual_entities_dataset.separate_to_groups()
-
-        self.xy_dataset = torch.utils.data.Subset(self.dual_entities_dataset, indexes_of_entities_with_all_fields)
-        train_size = int(self.train_size * len(self.xy_dataset))
-        validation_size = len(self.xy_dataset) - train_size
+        train_size = int(self.train_size * len(self.data))
+        validation_size = len(self.data) - train_size
         # train and validate only according to the patients with both fields.
 
-        self.xy_train_dataset, self.xy_validation_dataset = torch.utils.data.random_split(self.xy_dataset,
-                                                                                          [train_size, validation_size])
+        self.train_data, self.validation_data = torch.utils.data.random_split(self.data, [train_size, validation_size])
 
     def train_dataloader(self):
-        return torch.utils.data.DataLoader(self.xy_train_dataset, shuffle=True,
+        return torch.utils.data.DataLoader(self.train_data, shuffle=True,
                                            batch_size=self.train_batch_size)
 
     def val_dataloader(self):
-        return torch.utils.data.DataLoader(self.xy_validation_dataset, batch_size=self.validation_batch_size,
+        return torch.utils.data.DataLoader(self.validation_data, batch_size=self.validation_batch_size,
                                            shuffle=False)
 
 
-class ConcatDataModule(pl.LightningDataModule):
-    def __init__(self, data_path, batch_size: int = 10):
+class TrainOnlyDataModule(pl.LightningDataModule):
+    def __init__(self, data, batch_size: int = 10):
         super().__init__()
-        self.data_path = data_path
+        self.data = data
         self.batch_size = batch_size
 
-    def setup(self,stage: str = None):
-        if os.path.isfile(self.data_path):
-            with open(self.data_path, 'rb') as data_file:
-                self.concatds = pickle.load(data_file)
-        # Not valid
-        else:
-            raise FileNotFoundError(self.data_path)
-
     def train_dataloader(self):
-        return torch.utils.data.DataLoader(self.concatds,self.batch_size,shuffle=True)
+        return torch.utils.data.DataLoader(self.data, self.batch_size, shuffle=True)

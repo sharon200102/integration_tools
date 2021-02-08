@@ -1,0 +1,19 @@
+model_params: 
+  layers_structure:
+  - 271
+  - 135
+  - 40
+  kld_coefficient: 0.01
+  learning_rate: 0.001
+     
+
+trainer_params:
+  patience: 5
+
+program_params:
+  data_path: "../microbiome_projects/microbiome/Projects/BGU_fatty_liver/data/exported_data/latent_representation_data/concatenated_xy_dataset"
+  model_name: "VAE"
+  results_dir: "../microbiome_projects/microbiome/Projects/BGU_fatty_liver/data/exported_data/latent_representation_data"
+  patience: 5
+  monitor: 'val_loss'
+

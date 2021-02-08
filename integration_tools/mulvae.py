@@ -3,8 +3,8 @@ import torch.utils.data
 from torch import nn, optim
 from torch.nn import functional as F
 from pytorch_lightning.core.lightning import LightningModule
-from .stdvae import StandardVAE
-from .Constants import  activation_fn_dict,optimizers_dict
+from .ProjectionModels.stdvae import StandardVAE
+from .Constants import activation_fn_dict,optimizers_dict
 
 
 class MultipleVAE(LightningModule):

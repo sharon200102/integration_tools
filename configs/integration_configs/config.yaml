@@ -1,0 +1,40 @@
+core_params:
+
+  xgenerator_architecture:
+  - 203
+  - 100
+ 
+  ygenerator_architecture:
+  - 68
+  discriminator_architecture:
+  - 20
+  latent_layer_size: 40
+tuned_params:
+
+  learning_rate:
+  - 0.0001
+  - 0.01
+  - 2
+  
+  
+data_params:
+  batch_size: 10
+
+program_params: 
+  model_name: 'IntegrativeGAN'
+  data_path: "../microbiome_projects/microbiome/Projects/BGU_fatty_liver/data/exported_data/latent_representation_data/xy_dataset_and_ground_truth"
+  save_dir: "../microbiome_projects/microbiome/Projects/BGU_fatty_liver/data/exported_data/latent_representation_data/integration_models"
+  
+logger_params:
+  on_end: 'train_end'
+  
+  metric_params:
+    loss: 'total_loss'
+    xgenerator_loss: "xgenerator_loss"
+    ygenerator_loss: "ygenerator_loss"
+    discriminator_loss: "discriminator_loss"
+    
+trainer_params:
+  max_epochs: 100
+    
+
