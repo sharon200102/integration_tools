@@ -44,6 +44,15 @@ class DualEntity():
         # field zero is absent
         return FIELD_ONE_ONLY
 
+    def get_fields(self):
+        entity_status = self.get_status()
+        if entity_status == ALL_FIELDS:
+            return pd.concat([self.field0, self.field1])
+        elif entity_status == FIELD_ZERO_ONLY:
+            return self.field0
+        else:
+            return self.field1
+
 
 class DualDataset(Dataset):
     """The core of the object is an iterable of Dual_entities"""
@@ -59,7 +68,9 @@ class DualDataset(Dataset):
         """
         self.entities = dual_entities
         self.transform = transform
-        self.dict_retrieval_flag = 1
+        self.simplified = [entity.get_fields() for entity in self.entities]
+        self.id0 =[entity.id0 for entity in self.entities ]
+        self.id1 =[entity.id1 for entity in self.entities ]
 
     @classmethod
     def from_sources(cls, source0: pd.DataFrame, source1: pd.DataFrame = None, matching_info_source0=None,
@@ -184,10 +195,9 @@ class DualDataset(Dataset):
 
     def __getitem__(self, idx):
         if self.transform is None:
-            retrieved_entity = self.entities[idx]
+            return self.entities[idx]
         else:
-            retrieved_entity = self.transform(self.entities[idx])
-        return retrieved_entity.entity_dict if self.dict_retrieval_flag else retrieved_entity
+            return self.transform(self.entities[idx])
 
     @classmethod
     def subset(cls, full_data, indices: list, **kwargs):

@@ -16,15 +16,26 @@ class ToTensor(object):
         return DualEntity(sample_dict_copy)
 
 
-class Concatenate(object):
-    """Convert ndarrays in sample to Tensors."""
+
+
+class EntityToTensor(object):
+    """Convert an Tensor entity to tensor based on its fields"""
+
+    def __init__(self, **kwargs):
+        self.kwargs = kwargs
+
+    def __call__(self, sample: DualEntity):
+        if sample.field0 is not None and sample.field1 is not None:
+            return torch.cat([sample.field0, sample.field1], **self.kwargs)
+        elif sample.field0 is not None:
+            return sample.field0
+        else:
+            return sample.field1
+
+
+class Todict(object):
+    """Convert the entity to its corresponding dict."""
 
     def __call__(self, sample):
-        sample_dict = sample.entity_dict
-        x = sample_dict.get('FIELD0', None)
-        y = sample_dict.get('FIELD1', None)
-
-        if x is not None and y is not None:
-            return torch.cat([x, y])
-        else:
-            pass
+        sample_dict_copy = dict(sample.entity_dict)
+        return sample_dict_copy

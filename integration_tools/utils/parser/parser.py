@@ -1,6 +1,34 @@
 
 import os
 from typing import List, Any
+import pickle
+import yaml
+
+def load_yaml(path: str) ->object:
+    with open(path, 'r') as file:
+        try:
+            parameters= yaml.safe_load(file)
+        except yaml.YAMLError as exc:
+            print(exc)
+    return parameters
+
+
+def load_pickle(path: str) -> object:
+    """Dispatcher function, to load binary file
+
+     Args:
+    ------
+       path (str): pickle path
+
+    Return:
+    -------
+       obj (object): python object
+
+    """
+    with open(path, 'rb') as handle:
+        obj = pickle.load(handle)
+
+    return obj
 
 
 

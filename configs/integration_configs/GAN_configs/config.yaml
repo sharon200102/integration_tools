@@ -1,0 +1,18 @@
+authorName: Sharon Komissarov
+experimentName: Fatty_liver_GAN_integration
+trialConcurrency: 1
+maxExecDuration: 1h
+maxTrialNum: 500
+trainingServicePlatform: local
+# The path to Search Space
+searchSpacePath: search_space.json
+useAnnotation: false
+tuner:
+  builtinTunerName: Anneal
+  classArgs: 
+      optimize_mode: minimize
+# The path and the running command of trial
+trial:
+  command: python3 "/home/sharon200102/Documents/second\ degree/Research/integration_tools/run_nni.py" --fixed_parameters "/home/sharon200102/Documents/second\ degree/Research/integration_tools/configs/integration_configs/GAN_configs/fixed_parameters.yaml"
+  codeDir: /home/sharon200102/Documents/second degree/Research/integration_tools
+  gpuNum: 0

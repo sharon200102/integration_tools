@@ -85,12 +85,7 @@ class MultipleVAE(LightningModule):
                                       'similarity_loss_x_xy'] + loss_dict['similarity_loss_y_xy']
         return loss_dict
 
-    @staticmethod
-    def _set_default_parameters(input_dict:dict,default_dict:dict):
-        input_dict=input_dict.copy()
-        for key,value in default_dict.items():
-            input_dict.setdefault(key, value)
-        return input_dict
+
     @classmethod
     def get_hyper_parameter_search_dict(cls):
         return {'latent_layer_size':'linear_scale','klb_coefficient':'log_scale','learning_rate':'log_scale'}

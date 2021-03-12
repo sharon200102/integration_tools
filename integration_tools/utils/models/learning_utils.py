@@ -27,3 +27,9 @@ def early_stopping(history, patience=2, ascending=True):
         return history[-patience - 1] == max(history[-patience - 1:])
     else:
         return history[-patience - 1] == min(history[-patience - 1:])
+
+def set_default_parameters(input_dict:dict,default_dict:dict):
+    input_dict=input_dict.copy()
+    for key,value in default_dict.items():
+        input_dict.setdefault(key, value)
+    return input_dict

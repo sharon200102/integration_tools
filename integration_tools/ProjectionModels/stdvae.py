@@ -3,7 +3,9 @@ import torch.utils.data
 from torch import nn, optim
 from torch.nn import functional as F
 import pytorch_lightning as pl
-from ..Constants import activation_fn_dict,optimizers_dict
+from ..Constants import activation_fn_dict, optimizers_dict
+from .Base import BaseProjector
+from .._types import Tensor
 
 
 class StandardVAE(nn.Module):
@@ -93,15 +95,10 @@ class StandardVAE(nn.Module):
         return {'loss': loss, 'Reconstruction_Loss': recons_loss, 'KLD': -kld_loss}
 
 
+class StandardVAE_pl(BaseProjector):
 
-
-
-
-
-
-class StandardVAE_pl(pl.LightningModule):
-
-    def __init__(self, layers_structure, activation_fn='relu', kld_coefficient=1, learning_rate=0.01,optimizer='adam'):
+    def __init__(self, layers_structure, activation_fn='relu', kld_coefficient=1, learning_rate=0.01,
+                 optimizer_name='adam'):
         """
         :param layers_structure: An iterable which will form the structure of the encoder, As a result, the structure
         of the decoder will be symmetrical.
@@ -110,6 +107,7 @@ class StandardVAE_pl(pl.LightningModule):
         """
 
         super().__init__()
+        self.save_hyperparameters()
         reversed_layers_structure = layers_structure[::-1]  # the reversed list will form the structure of the decoder.
         self.encoding_layers = nn.ModuleList(
             [nn.Linear(layers_structure[i], layers_structure[i + 1]) for i in
@@ -126,9 +124,8 @@ class StandardVAE_pl(pl.LightningModule):
              range(0, len(reversed_layers_structure) - 1)])
 
         # hyper parameters introduction
-        self.kld_coefficient = kld_coefficient
-        self.lr = learning_rate
-        self.optimizer = optimizers_dict[optimizer]
+
+        self.optimizer = optimizers_dict[optimizer_name]
         self.activation_fn = activation_fn_dict[activation_fn]()
 
     def forward(self, input):
@@ -177,7 +174,7 @@ class StandardVAE_pl(pl.LightningModule):
         return z
 
     def configure_optimizers(self):
-        return self.optimizer(self.parameters(), lr=self.lr)
+        return self.optimizer(self.parameters(), lr=self.hparams.learning_rate)
 
     def training_step(self, batch, batch_idx):
 
@@ -197,7 +194,7 @@ class StandardVAE_pl(pl.LightningModule):
 
     def validation_epoch_end(self, val_outputs):
         avg_val_loss = torch.tensor([x['loss'] for x in val_outputs]).mean()
-        self.log('val_loss', avg_val_loss, prog_bar=True)
+        self.log('val_loss',avg_val_loss,logger=True,prog_bar=True)
 
     def loss_function(self, *args):
         """
@@ -208,9 +205,15 @@ class StandardVAE_pl(pl.LightningModule):
         input = args[1]
         mu = args[2]
         log_var = args[3]
-        kld_weight = self.kld_coefficient
+        kld_weight = self.hparams.kld_coefficient
         recons_loss = F.mse_loss(recons, input)
         kld_loss = torch.mean(-0.5 * torch.sum(1 + log_var - mu ** 2 - log_var.exp(), dim=1), dim=0)
         loss = recons_loss + kld_weight * kld_loss
 
         return {'loss': loss, 'Reconstruction_Loss': recons_loss, 'KLD': kld_loss}
+
+    def project_the_data(self, data: Tensor) -> Tensor:
+        self.eval()
+        with torch.no_grad():
+            projected_data = self(data)[4]
+            return projected_data
