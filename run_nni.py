@@ -21,7 +21,7 @@ def main(fixed_args, tuned_args):
     # Creating the model.
     model = IntegrativeGAN.from_configuration_dictionaries(tuned_args, fixed_args)
     # Creating the callbacks.
-    checkpoint_callback = ModelCheckpoint(monitor=monitor, dirpath=model_checkpoints_folder)
+    checkpoint_callback = ModelCheckpoint(monitor=monitor, dirpath=model_checkpoints_folder,save_last=True)
     callbacks.extend([checkpoint_callback])
 
     # Create a logger for the IntegrativeGAN
