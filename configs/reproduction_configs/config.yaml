@@ -1,0 +1,27 @@
+xgenerator:
+  layers_structure:
+  - 203
+  - 100
+  - 64
+  activation_fn: "relu"
+  use_batch_norm: True
+
+ygenerator:
+  layers_structure:
+  - 68
+  - 64
+  activation_fn: "relu"
+  use_batch_norm: True
+
+discriminator:
+  layers_structure:
+    - 64
+    - 64
+    - 8
+    - 2
+  activation_fn: "relu"
+  use_batch_norm: True
+
+
+
+

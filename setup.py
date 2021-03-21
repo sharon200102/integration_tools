@@ -18,7 +18,8 @@ INSTALL_REQUIRES = [
       'torch',
       'pandas',
       'typing',
-      'argparse'
+      'argparse',
+      'pytorch_lightning'
       
 ]
 

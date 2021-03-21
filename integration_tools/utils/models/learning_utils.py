@@ -1,35 +1,31 @@
-def make_train_step(model, optimizer):
-    # Builds function that performs a step in the train loop
-    def train_step(x, y):
-        # Sets model to TRAIN mode
-        model.train()
-        # forward
-        forward_dict = model(x, y)
-        # Computes loss
-        loss_dict = model.loss_function(forward_dict)
-        total_loss = loss_dict['total_loss']
-        # Computes gradients
-        total_loss.backward()
-        # Updates parameters and zeroes gradients
-        optimizer.step()
-        optimizer.zero_grad()
-        # Returns the loss
-        return loss_dict
-
-    # Returns the function that will be called inside the train loop
-    return train_step
+import torch
+import torch.nn as nn
+import torch.nn.init as init
 
 
-def early_stopping(history, patience=2, ascending=True):
-    if len(history) <= patience:
-        return False
-    if ascending:
-        return history[-patience - 1] == max(history[-patience - 1:])
-    else:
-        return history[-patience - 1] == min(history[-patience - 1:])
+class MiniBatchDiscrimination(nn.Module):
+    def __init__(self, in_features, out_features, kernel_dims, mean=False):
+        super().__init__()
+        self.in_features = in_features
+        self.out_features = out_features
+        self.kernel_dims = kernel_dims
+        self.mean = mean
+        self.T = nn.Parameter(torch.Tensor(in_features, out_features, kernel_dims))
+        init.normal(self.T, 0, 1)
 
-def set_default_parameters(input_dict:dict,default_dict:dict):
-    input_dict=input_dict.copy()
-    for key,value in default_dict.items():
-        input_dict.setdefault(key, value)
-    return input_dict
+    def forward(self, x):
+        # x is NxA
+        # T is AxBxC
+        matrices = x.mm(self.T.view(self.in_features, -1))
+        matrices = matrices.view(-1, self.out_features, self.kernel_dims)
+
+        M = matrices.unsqueeze(0)  # 1xNxBxC
+        M_T = M.permute(1, 0, 2, 3)  # Nx1xBxC
+        norm = torch.abs(M - M_T).sum(3)  # NxNxB
+        expnorm = torch.exp(-norm)
+        o_b = (expnorm.sum(0) - 1)  # NxB, subtract self distance
+        if self.mean:
+            o_b /= x.size(0) - 1
+
+        x = torch.cat([x, o_b], 1)
+        return x
