@@ -215,5 +215,5 @@ class StandardVAE_pl(BaseProjector):
     def project_the_data(self, data: Tensor) -> Tensor:
         self.eval()
         with torch.no_grad():
-            projected_data = self(data)[4]
+            projected_data = self.reparameterize(*self.encode(data))
             return projected_data

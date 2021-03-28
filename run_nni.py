@@ -14,9 +14,11 @@ from integration_tools.utils.parser.parser import load_yaml, load_pickle
 import pickle
 from integration_tools.generators_collection.base import Generator
 from integration_tools.discrimantors_collection.base import Discriminator
+import torch
+torch.manual_seed(1)
 
 
-def main(fixed_args, tuned_args, trial_id):
+def main(fixed_args, tuned_args, trial_id,results_folder):
     """""defining some constants"""
     """DEFAULT_VALUES"""
     default_latent_representation_size = 10
@@ -44,6 +46,11 @@ def main(fixed_args, tuned_args, trial_id):
     default_xgenerator_batch_norm = True
     default_ygenerator_batch_norm = True
     default_discriminator_batch_norm = True
+    default_use_mini_batch_discrimination = False
+    default_layer_index = None
+    default_similarity_features = 10
+    default_kernel_dims = 10
+    default_mini_batch_discrimination_kwargs = None
 
     default_tuned_dict = {'latent_representation_size': default_latent_representation_size,
                           'projector_klb_coefficient': default_projector_klb_coefficient,
@@ -68,7 +75,12 @@ def main(fixed_args, tuned_args, trial_id):
                           'projection_validation_batch_size': default_projection_validation_batch_size,
                           'xgenerator_batch_norm': default_xgenerator_batch_norm,
                           'ygenerator_batch_norm': default_ygenerator_batch_norm,
-                          'discriminator_batch_norm': default_discriminator_batch_norm
+                          'discriminator_batch_norm': default_discriminator_batch_norm,
+                          'use_mini_batch_discrimination': default_use_mini_batch_discrimination,
+                          'layer_index': default_layer_index,
+                          'similarity_features': default_similarity_features,
+                          'kernel_dims': default_kernel_dims,
+                          'mini_batch_discrimination_kwargs': default_mini_batch_discrimination_kwargs
 
                           }
 
@@ -101,7 +113,11 @@ def main(fixed_args, tuned_args, trial_id):
                            fixed_parameters['ygenerator_batch_norm'])
     discriminator = Discriminator(discriminator_architecture,
                                   fixed_parameters['discriminator_activation_function_name'],
-                                  fixed_parameters['discriminator_batch_norm'])
+                                  fixed_parameters['discriminator_batch_norm'],
+                                  fixed_parameters['use_mini_batch_discrimination'],
+                                  fixed_parameters['layer_index'], fixed_parameters['similarity_features'],
+                                  fixed_parameters['kernel_dims'], fixed_parameters['mini_batch_discrimination_kwargs'])
+
     model = IntegrativeGAN(xgenerator, ygenerator, discriminator, data, projection_model,
                            tuned_parameters['xgenerator_learning_rate'],
                            tuned_parameters['ygenerator_learning_rate'],
@@ -111,12 +127,13 @@ def main(fixed_args, tuned_args, trial_id):
                            tuned_parameters['train_batch_size'], fixed_parameters['validation_batch_size'],
                            fixed_parameters['projection_train_percent'],
                            fixed_parameters['projection_train_batch_size'],
-                           fixed_parameters['projection_validation_batch_size'])
+                           fixed_parameters['projection_validation_batch_size'],results_dir=results_folder,
+                           projection_identifier = str(trial_id))
 
     callbacks = []
     monitor = 'val_loss'
-    model_logs_folder = 'GAN_Logs'
-    model_checkpoints_folder = os.path.join('GAN_checkpoints', '{}'.format(trial_id))
+    model_logs_folder = os.path.join(results_folder, 'GAN_Logs')
+    model_checkpoints_folder = os.path.join(results_folder, 'GAN_checkpoints', '{}'.format(trial_id))
     max_epochs = 200
     # Creating the model.
     # Creating the callbacks.
@@ -139,11 +156,21 @@ def main(fixed_args, tuned_args, trial_id):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Runner for Integrative GAN')
     parser.add_argument('--fixed_parameters', '-f',
-                        dest="filename",
+                        dest="fixed_parameters_file",
                         metavar='FILE',
                         help='path to the fixed parameters file')
+    parser.add_argument('--results_dir','-r',dest= 'results_path',default='.',help='path to a folder where the results should '
+                                                                                   'be located')
 
     args = parser.parse_args()
-    fixed_parameters = load_yaml(args.filename)
-    tuned_parameters = nni.get_next_parameter()
-    main(fixed_parameters, tuned_parameters, nni.get_sequence_id())
+    fixed_parameters = load_yaml(args.fixed_parameters_file)
+    tuned_parameters =nni.get_next_parameter()
+    """tuned_parameters = {'latent_representation_size': 8, 'projector_klb_coefficient': 0.0005,
+                        'projector_learning_rate': 0.001, 'xgenerator_learning_rate': 0.0001,
+                        'ygenerator_learning_rate': 0.0001, 'discriminator_learning_rate': 0.001,
+                        'train_batch_size': 16}"""
+
+    # tuned_parameters = nni.get_next_parameter()
+    main(fixed_parameters, tuned_parameters, nni.get_sequence_id(),args.results_path)
+
+#-f configs/integration_configs/GAN_configs/GDM/fixed_parameters.yaml -r results/GDM/batch_discrimination_with_batch_normalization

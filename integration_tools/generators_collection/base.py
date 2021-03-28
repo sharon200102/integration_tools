@@ -29,7 +29,13 @@ class Generator(nn.Module):
 
     def forward(self, x):
         for module in self.modules_list:
-            x = module(x)
+            # Batch Norm requires a batch dimension, if missing, add one.
+            try:
+                x = module(x)
+
+            except ValueError:
+                x = x.unsqueeze(0)
+                x = module(x)
         return x
 
     def block(self, in_feat, out_feat, activation=True,use_batch_norm = True):

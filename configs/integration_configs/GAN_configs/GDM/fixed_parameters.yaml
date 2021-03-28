@@ -1,0 +1,23 @@
+data_path: "/home/sharon200102/Documents/second_degree/Research/microbiome_projects/microbiome/Projects/GDM/experiment1/data/data_used/entities_datasets/entities"
+xgenerator_internal_layers_structure:
+  - 180
+  - 100
+ygenerator_internal_layers_structure:
+  - 180
+  - 100
+discriminator_internal_layers_structure:
+  - 64
+  - 32
+  - 8
+projector_internal_layers_structure:
+  - 360
+  - 200
+  - 100
+  
+use_mini_batch_discrimination: True
+layer_index: 3
+similarity_features: 8
+kernel_dims: 8
+
+
+

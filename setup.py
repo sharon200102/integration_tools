@@ -3,14 +3,14 @@ from setuptools import setup, find_packages
 
 HERE = pathlib.Path(__file__).parent
 
-VERSION = '0.7.0 '
+VERSION = '0.7.1 '
 PACKAGE_NAME = 'integration_tools'
 AUTHOR = 'Sharon Komissarov'
 AUTHOR_EMAIL = 'sharon200102@gmail.com'
-URL = 'https://github.com/sharon200102/integration_tools'
+URL = 'https://github.com/sharon200102/integration_tools/tree/update_to_pytorch_lightning'
 
 LICENSE = ' MIT License'
-DESCRIPTION = 'A package in development stages which allows to intgrate few data-sets using machine learning tools'
+DESCRIPTION = 'A package in development stages which allows to integrate few data-sets using machine learning tools'
 LONG_DESCRIPTION = (HERE / "README.md").read_text()
 LONG_DESC_TYPE = "text/markdown"
 

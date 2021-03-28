@@ -14,6 +14,7 @@ from .utils.transforms.transforms_classes import EntityToTensor, ToTensor, Todic
 from .ProjectionModels.stdvae import StandardVAE_pl
 import torch
 from copy import deepcopy
+from os.path import join
 
 GROUND_TRUTH = 0
 GENERATED = 1
@@ -29,7 +30,8 @@ class IntegrativeGAN(pl.LightningModule):
                  xgenerator_optimizer_name='adam', ygenerator_optimizer_name='adam',
                  discriminator_optimizer_name='adam', train_percent=0.8, train_batch_size=10, validation_batch_size=10,
                  projection_train_percent=0.8,
-                 projection_train_batch_size=10, projection_validation_batch_size=10):
+                 projection_train_batch_size=10, projection_validation_batch_size=10,results_dir = '.',
+                 projection_identifier =None):
 
         """The function doesn't receive the actual generators and discriminator due to the fact that they cannot be
         saved as hyper parameters """
@@ -54,8 +56,11 @@ class IntegrativeGAN(pl.LightningModule):
 
     def prepare_data(self) -> None:
         projection_model_class_name = type(self.projection_model).__name__
-        model_checkpoints_folder = '{}_checkpoints'.format(projection_model_class_name)
-        model_logs_folder = '{}_Logs'.format(projection_model_class_name)
+        model_checkpoints_folder = join(self.hparams.results_dir,'{}_checkpoints'.format(projection_model_class_name),
+                                        self.hparams.projection_identifier) if self.hparams.projection_identifier is not None\
+            else join(self.hparams.results_dir,'{}_checkpoints'.format(projection_model_class_name))
+
+        model_logs_folder = join(self.hparams.results_dir,'{}_Logs'.format(projection_model_class_name))
 
         monitor = None
         callbacks = []
@@ -100,7 +105,7 @@ class IntegrativeGAN(pl.LightningModule):
 
     def train_dataloader(self) -> DataLoader:
         return torch.utils.data.DataLoader(self.gan_train_data, shuffle=True,
-                                           batch_size=self.hparams.train_batch_size)
+                                           batch_size=self.hparams.train_batch_size,drop_last=True)
 
     def val_dataloader(self):
         return torch.utils.data.DataLoader(self.gan_validation_data, shuffle=False,
@@ -183,10 +188,11 @@ class IntegrativeGAN(pl.LightningModule):
     def validation_epoch_end(self, outputs) -> None:
         avg_val_loss = torch.tensor([x['loss'] for x in outputs]).mean()
         self.log('val_loss', avg_val_loss, logger=True, prog_bar=True)
+        # log the vla loss with respect to the epoch number
         self.logger.experiment.add_scalar("validation_loss_per_epoch", avg_val_loss, self.current_epoch)
 
     def project_the_data(self) -> Tensor:
-        self.eval()
+        self.eval_all()
         with torch.no_grad():
             outputs = []
             tensor_entities = [torch.tensor(simplified_entity, dtype=torch.float32, requires_grad=False)
@@ -199,8 +205,15 @@ class IntegrativeGAN(pl.LightningModule):
                     result = self.xgenerator(tensor_entity)
                 elif entity_status == FIELD_ONE_ONLY:
                     result = self.ygenerator(tensor_entity)
+                # Batch norm may cause a dimension increasment, therefore the squeeze function is applied,
+                result = result.squeeze()
                 outputs.append(result)
         return torch.stack(outputs)
+
+    def eval_all(self):
+        self.xgenerator.eval()
+        self.ygenerator.eval()
+        self.discriminator.eval()
 
     """@classmethod
         def from_configuration_dictionaries(cls, tuned_parameters: dict, fixed_parameters: dict):

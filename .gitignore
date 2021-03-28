@@ -7,4 +7,4 @@ build
 integration_tools.egg-info
 .idea/
 *__pycache__
-
+/results
