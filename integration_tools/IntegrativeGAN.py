@@ -30,8 +30,8 @@ class IntegrativeGAN(pl.LightningModule):
                  xgenerator_optimizer_name='adam', ygenerator_optimizer_name='adam',
                  discriminator_optimizer_name='adam', train_percent=0.8, train_batch_size=10, validation_batch_size=10,
                  projection_train_percent=0.8,
-                 projection_train_batch_size=10, projection_validation_batch_size=10,results_dir = '.',
-                 projection_identifier =None):
+                 projection_train_batch_size=10, projection_validation_batch_size=10, results_dir='.',
+                 projection_identifier=None):
 
         """The function doesn't receive the actual generators and discriminator due to the fact that they cannot be
         saved as hyper parameters """
@@ -56,11 +56,11 @@ class IntegrativeGAN(pl.LightningModule):
 
     def prepare_data(self) -> None:
         projection_model_class_name = type(self.projection_model).__name__
-        model_checkpoints_folder = join(self.hparams.results_dir,'{}_checkpoints'.format(projection_model_class_name),
-                                        self.hparams.projection_identifier) if self.hparams.projection_identifier is not None\
-            else join(self.hparams.results_dir,'{}_checkpoints'.format(projection_model_class_name))
+        model_checkpoints_folder = join(self.hparams.results_dir, '{}_checkpoints'.format(projection_model_class_name),
+                                        self.hparams.projection_identifier) if self.hparams.projection_identifier is not None \
+            else join(self.hparams.results_dir, '{}_checkpoints'.format(projection_model_class_name))
 
-        model_logs_folder = join(self.hparams.results_dir,'{}_Logs'.format(projection_model_class_name))
+        model_logs_folder = join(self.hparams.results_dir, '{}_Logs'.format(projection_model_class_name))
 
         monitor = None
         callbacks = []
@@ -105,7 +105,7 @@ class IntegrativeGAN(pl.LightningModule):
 
     def train_dataloader(self) -> DataLoader:
         return torch.utils.data.DataLoader(self.gan_train_data, shuffle=True,
-                                           batch_size=self.hparams.train_batch_size,drop_last=True)
+                                           batch_size=self.hparams.train_batch_size, drop_last=True)
 
     def val_dataloader(self):
         return torch.utils.data.DataLoader(self.gan_validation_data, shuffle=False,
@@ -132,42 +132,42 @@ class IntegrativeGAN(pl.LightningModule):
 
         # train the discriminator
         if optimizer_idx == 0:
-            real_latent_representation_label = torch.full((b_size,), GROUND_TRUTH, dtype=torch.long)
+            real_latent_representation_label = torch.full((b_size,), GROUND_TRUTH, dtype=torch.long,requires_grad=False)
             # Forward pass ground_truth batch through D
-            err_ground_truth = self.adversarial_loss(self.discriminator(ground_truth_representation),
+            err_ground_truth = self.adversarial_loss(self.discriminator(ground_truth_representation.detach()),
                                                      real_latent_representation_label)
 
             # Train discriminator to identify x_generated_representation from ground_truth
-            fake_x_label = torch.full((b_size,), GENERATED, dtype=torch.long)
+            fake_x_label = torch.full((b_size,), GENERATED, dtype=torch.long,requires_grad=False)
             err_disc_x_generated_representation = self.adversarial_loss(
                 self.discriminator(self.xgenerator(x).detach()),
                 fake_x_label)
 
             # Train discriminator to identify y_generated_representation from ground_truth
-            fake_y_label = torch.full((b_size,), GENERATED, dtype=torch.long)
+            fake_y_label = torch.full((b_size,), GENERATED, dtype=torch.long,requires_grad=False)
             err_disc_y_generated_representation = self.adversarial_loss(
                 self.discriminator(self.ygenerator(y).detach()),
                 fake_y_label)
 
             self.errD = err_ground_truth + err_disc_x_generated_representation + err_disc_y_generated_representation
-            self.log('discriminator_loss', self.errD, on_step=False, on_epoch=True, prog_bar=True, logger=True)
+            self.log('discriminator_loss', self.errD,prog_bar=True, logger=True)
             return {'loss': self.errD}
 
         # Train the X generator
         if optimizer_idx == 1:
-            real_latent_representation_label = torch.full((b_size,), GROUND_TRUTH, dtype=torch.long)
+            real_latent_representation_label = torch.full((b_size,), GROUND_TRUTH, dtype=torch.long,requires_grad=False)
             self.err_gx = self.adversarial_loss(self.discriminator(self.xgenerator(x)),
                                                 real_latent_representation_label)
-            self.log('xgenerator_loss', self.err_gx, on_step=False, on_epoch=True, prog_bar=True, logger=True)
+            self.log('xgenerator_loss', self.err_gx,prog_bar=True, logger=True)
 
             return {'loss': self.err_gx}
         # Train The Y generator
         if optimizer_idx == 2:
-            real_latent_representation_label = torch.full((b_size,), GROUND_TRUTH, dtype=torch.long)
+            real_latent_representation_label = torch.full((b_size,), GROUND_TRUTH, dtype=torch.long,requires_grad=False)
             self.err_gy = self.adversarial_loss(self.discriminator(self.ygenerator(y)),
                                                 real_latent_representation_label)
-            self.log('ygenerator_loss', self.err_gy, on_step=False, on_epoch=True, prog_bar=True, logger=True)
-            self.log('total_loss', self.err_gx + self.err_gy, on_step=False, on_epoch=True, prog_bar=True, logger=True)
+            self.log('ygenerator_loss', self.err_gy,prog_bar=True, logger=True)
+            self.log('total_loss', self.err_gx + self.err_gy,prog_bar=True, logger=True)
 
             return {'loss': self.err_gy}
 
@@ -176,7 +176,7 @@ class IntegrativeGAN(pl.LightningModule):
         raw_samples, ground_truth_representation = batch
         x, y = raw_samples['FIELD0'], raw_samples['FIELD1']
         b_size = x.shape[0]
-        real_latent_representation_label = torch.full((b_size,), GROUND_TRUTH, dtype=torch.long)
+        real_latent_representation_label = torch.full((b_size,), GROUND_TRUTH, dtype=torch.long,requires_grad=False)
         err_gx = self.adversarial_loss(self.discriminator(self.xgenerator(x)),
                                        real_latent_representation_label)
 
@@ -186,7 +186,7 @@ class IntegrativeGAN(pl.LightningModule):
         return {'loss': err_gx + err_gy}
 
     def validation_epoch_end(self, outputs) -> None:
-        avg_val_loss = torch.tensor([x['loss'] for x in outputs]).mean()
+        avg_val_loss = torch.tensor([x['loss'] for x in outputs],requires_grad=False).mean()
         self.log('val_loss', avg_val_loss, logger=True, prog_bar=True)
         # log the vla loss with respect to the epoch number
         self.logger.experiment.add_scalar("validation_loss_per_epoch", avg_val_loss, self.current_epoch)
@@ -205,7 +205,7 @@ class IntegrativeGAN(pl.LightningModule):
                     result = self.xgenerator(tensor_entity)
                 elif entity_status == FIELD_ONE_ONLY:
                     result = self.ygenerator(tensor_entity)
-                # Batch norm may cause a dimension increasment, therefore the squeeze function is applied,
+                # Batch norm may cause a dimension increment, therefore the squeeze function is applied,
                 result = result.squeeze()
                 outputs.append(result)
         return torch.stack(outputs)
@@ -214,6 +214,111 @@ class IntegrativeGAN(pl.LightningModule):
         self.xgenerator.eval()
         self.ygenerator.eval()
         self.discriminator.eval()
+
+
+
+
+
+
+class FMIntegrativeGAN(IntegrativeGAN):
+    def __init__(self, xgenerator, ygenerator, discriminator, data: DualDataset,
+                 projection_model, xgenerator_learning_rate=0.001, ygenerator_learning_rate=0.001,
+                 discriminator_learning_rate=0.001,
+                 xgenerator_optimizer_name='adam', ygenerator_optimizer_name='adam',
+                 discriminator_optimizer_name='adam', train_percent=0.8, train_batch_size=10, validation_batch_size=10,
+                 projection_train_percent=0.8,
+                 projection_train_batch_size=10, projection_validation_batch_size=10, results_dir='.',
+                 projection_identifier=None):
+
+        super(FMIntegrativeGAN, self).__init__(xgenerator, ygenerator, discriminator, data,
+                                               projection_model, xgenerator_learning_rate, ygenerator_learning_rate,
+                                               discriminator_learning_rate,
+                                               xgenerator_optimizer_name, ygenerator_optimizer_name,
+                                               discriminator_optimizer_name, train_percent, train_batch_size,
+                                               validation_batch_size,
+                                               projection_train_percent,
+                                               projection_train_batch_size, projection_validation_batch_size,
+                                               results_dir,
+                                               projection_identifier)
+
+        self.xgenerator_loss = nn.MSELoss(reduction='sum')
+        self.ygenerator_loss = nn.MSELoss(reduction='sum')
+
+    def training_step(self, batch, batch_idx, optimizer_idx):
+        raw_samples, ground_truth_representation = batch
+        x, y = raw_samples['FIELD0'], raw_samples['FIELD1']
+        b_size = x.shape[0]
+
+        # train the discriminator
+        if optimizer_idx == 0:
+            real_latent_representation_label = torch.full((b_size,), GROUND_TRUTH, dtype=torch.long,requires_grad=False)
+            # Forward pass ground_truth batch through D
+            err_ground_truth = self.adversarial_loss(self.discriminator(ground_truth_representation.detach()),
+                                                     real_latent_representation_label)
+
+            # Train discriminator to identify x_generated_representation from ground_truth
+            fake_x_label = torch.full((b_size,), GENERATED, dtype=torch.long,requires_grad=False)
+            err_disc_x_generated_representation = self.adversarial_loss(
+                self.discriminator(self.xgenerator(x).detach()),
+                fake_x_label)
+
+            # Train discriminator to identify y_generated_representation from ground_truth
+            fake_y_label = torch.full((b_size,), GENERATED, dtype=torch.long, requires_grad=False)
+            err_disc_y_generated_representation = self.adversarial_loss(
+                self.discriminator(self.ygenerator(y).detach()),
+                fake_y_label)
+
+            self.errD = err_ground_truth + err_disc_x_generated_representation + err_disc_y_generated_representation
+            self.log('discriminator_loss', self.errD, prog_bar=True, logger=True)
+            return {'loss': self.errD}
+
+        # Train the X generator
+        if optimizer_idx == 1:
+            # Apply feature matching, that is to say, calculate the mse
+            # between the expectation of the real features and the fake features.
+            real_features = self.discriminator(ground_truth_representation.detach(), matching=True)
+            fake_features = self.discriminator(self.xgenerator(x), matching=True)
+            mean_of_real_features = torch.mean(real_features, dim=0)
+            mean_of_fake_features = torch.mean(fake_features, dim=0)
+
+            self.err_gx = self.xgenerator_loss(mean_of_real_features.detach(), mean_of_fake_features)
+            self.log('xgenerator_loss', self.err_gx, prog_bar=True, logger=True)
+
+            return {'loss': self.err_gx}
+        # Train The Y generator
+        if optimizer_idx == 2:
+            # Apply feature matching, that is to say, calculate the ms
+            # between the expectation of the real features and the fake features.
+            real_features = self.discriminator(ground_truth_representation.detach(), matching=True)
+            fake_features = self.discriminator(self.ygenerator(y), matching=True)
+            mean_of_real_features = torch.mean(real_features, dim=0)
+            mean_of_fake_features = torch.mean(fake_features, dim=0)
+
+            self.err_gy = self.ygenerator_loss(mean_of_real_features.detach(), mean_of_fake_features)
+
+            self.log('ygenerator_loss', self.err_gy, prog_bar=True, logger=True)
+
+            self.log('total_loss', self.err_gx + self.err_gy, prog_bar=True, logger=True)
+            return {'loss': self.err_gy}
+
+    def validation_step(self, batch, batch_idx):
+
+        raw_samples, ground_truth_representation = batch
+        x, y = raw_samples['FIELD0'], raw_samples['FIELD1']
+
+        real_features = self.discriminator(ground_truth_representation.detach(), matching=True).detach()
+        mean_of_real_features = torch.mean(real_features, dim=0)
+
+        x_fake_features = self.discriminator(self.xgenerator(x), matching=True)
+        mean_of_xfake_features = torch.mean(x_fake_features, dim=0)
+
+        y_fake_features = self.discriminator(self.ygenerator(y), matching=True)
+        mean_of_yfake_features = torch.mean(y_fake_features, dim=0)
+
+        err_gx = self.xgenerator_loss(mean_of_real_features, mean_of_xfake_features)
+        err_gy = self.ygenerator_loss(mean_of_real_features, mean_of_yfake_features)
+
+        return {'loss': err_gx + err_gy}
 
     """@classmethod
         def from_configuration_dictionaries(cls, tuned_parameters: dict, fixed_parameters: dict):
