@@ -94,16 +94,17 @@ if __name__ == "__main__":
     parser_args = parser.parse_args()
     config_parameters = load_yaml(parser_args.config_path)
     if parser_args.nni_flag:
-        #tuned_parameters = nni.get_next_parameter()
-
-        tuned_parameters = {'latent_representation_size': 8, 'projector_klb_coefficient': 0.0005,
-                            'projector_learning_rate': 0.001, 'xgenerator_learning_rate': 0.0001,
-                            'ygenerator_learning_rate': 0.0001, 'discriminator_learning_rate': 0.001,
-                            'train_batch_size': 16}
-
+        tuned_parameters = nni.get_next_parameter()
         config_parameters = add_tuned_parameters(config_parameters, tuned_parameters)
 
     main(config_parameters, nni.get_sequence_id())
 
 
-# -f configs/integration_configs/GAN_configs/GDM/fixed_parameters.yaml -r results/GDM/batch_discrimination_with_batch_normalization
+#-c configs/integration_configs/GAN_configs/GDM/feature_matching_and_batch_discrimination/params.yaml  -n
+"""
+tuned_parameters = {'latent_representation_size': 8, 'projector_klb_coefficient': 0.0005,
+                            'projector_learning_rate': 0.001, 'xgenerator_learning_rate': 0.0001,
+                            'ygenerator_learning_rate': 0.0001, 'discriminator_learning_rate': 0.001,
+                            'train_batch_size': 10}
+        
+"""

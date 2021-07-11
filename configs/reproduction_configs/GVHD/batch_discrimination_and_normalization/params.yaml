@@ -1,0 +1,59 @@
+exp_params:
+  data_path: "/home/sharon200102/Documents/second_degree/Research/microbiome_projects/microbiome/Projects/GVHD_data_integration/data/data_used/entities_datasets/entities"
+model_params:
+  x_generator_name: "Generator"
+  y_generator_name: "Generator"
+  discriminator_name: "Discriminator"
+  projection_name: "StandardVAE_pl"
+  GAN_name: "IntegrativeGAN"
+  
+  x_generator_params:
+    layers_structure:
+      - 127
+      - 100
+      - 128
+    activation_fn: "relu"
+    use_batch_norm: True
+    
+  y_generator_params:
+    layers_structure:
+      - 148
+      - 100
+      - 128
+    activation_fn: "relu"
+    use_batch_norm: True
+
+
+  discriminator_params:
+    layers_structure:
+      - 128
+      - 64
+      - 16
+      - 8
+      - 2
+    activation_fn: "relu"
+    use_batch_norm: True
+    use_mini_batch_discrimination: True
+    layer_index: 3
+    similarity_features: 8
+    kernel_dims: 8
+
+
+
+  projection_params:
+    layers_structure:
+      - 275
+      - 200
+      - 100
+
+  GAN_params:
+    xgenerator_optimizer_name: "adam"
+    ygenerator_optimizer_name: "adam"
+    discriminator_optimizer_name: "adam"
+    xgenerator_learning_rate: 0.006594135544833868
+    ygenerator_learning_rate: 0.0016852532983349352
+    discriminator_learning_rate: 0.003324373525010366
+    train_batch_size: 16
+
+ 
+

@@ -7,7 +7,7 @@ import yaml
 def load_yaml(path: str) ->object:
     with open(path, 'r') as file:
         try:
-            parameters= yaml.safe_load(file)
+            parameters = yaml.safe_load(file)
         except yaml.YAMLError as exc:
             print(exc)
     return parameters

@@ -7,11 +7,13 @@ class Discriminator(nn.Module):
 
     def __init__(self, layers_structure: list, activation_fn: str = 'relu', use_batch_norm: bool = True,
                  use_mini_batch_discrimination: bool = False, layer_index: int = None,
-                 similarity_features: int = 10, kernel_dims: int = 10, mini_batch_discrimination_kwargs: dict = None):
+                 similarity_features: int = 10, kernel_dims: int = 10, mini_batch_discrimination_kwargs: dict = None,
+                 feature_matching_layer: int = None):
         super().__init__()
         self.activation_fn_name = activation_fn
         self.activation_fn = activation_fn_dict[activation_fn]()
         self.use_batch_norm = use_batch_norm
+        self.feature_matching_layer = feature_matching_layer
         if mini_batch_discrimination_kwargs is None:
             mini_batch_discrimination_kwargs = {}
 
@@ -19,7 +21,6 @@ class Discriminator(nn.Module):
 
         for i in range(0, len(layers_structure) - 1):
             if i == layer_index and use_mini_batch_discrimination:
-
                 mbd = MiniBatchDiscrimination(layers_structure[i], similarity_features, kernel_dims,
                                               **mini_batch_discrimination_kwargs)
                 modules.append(mbd)
@@ -34,7 +35,9 @@ class Discriminator(nn.Module):
                                           use_batch_norm=self.use_batch_norm))
         self.modules_list = nn.ModuleList(modules)
 
-    def forward(self, x):
+    def forward(self, x, matching: bool = False):
+        # keep track of the activation functions, for the feature-matching.
+        activation_layer_counter = 0
         for module in self.modules_list:
             # Batch Norm requires a batch dimension, if missing, add one.
             try:
@@ -43,6 +46,12 @@ class Discriminator(nn.Module):
             except ValueError:
                 x = x.unsqueeze(0)
                 x = module(x)
+
+            if module is self.activation_fn:
+                activation_layer_counter += 1
+                # IF the current layer is the feature matching layer, return immediately
+                if activation_layer_counter == self.feature_matching_layer and matching == True:
+                    return x
         return x
 
     def block(self, in_feat, out_feat, activation=True, use_batch_norm=True):

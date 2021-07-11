@@ -1,0 +1,65 @@
+exp_params:
+  data_path: "/home/sharon200102/Documents/second_degree/Research/microbiome_projects/microbiome/Projects/BGU_fatty_liver/data/data_used/entities_datasets/entities"
+  results_folder: "results/Fatty_liver/batch_discrimination"
+  
+
+logger_params:
+  GAN_logs_name: "GAN_Logs"
+  GAN_checkpoints_name: "GAN_checkpoints"
+  manual_seed: 1
+  
+  
+trainer_params:
+  max_epochs: 400
+
+
+model_params:
+  x_generator_name: "Generator"
+  y_generator_name: "Generator"
+  discriminator_name: "Discriminator"
+  projection_name: "StandardVAE_pl"
+  GAN_name: "IntegrativeGAN"
+  
+  x_generator_params:
+    layers_structure:
+      - 203
+      - 100
+    activation_fn: "relu"
+    use_batch_norm: True
+    
+  y_generator_params:
+    layers_structure:
+      - 68
+      - 100
+    activation_fn: "relu"
+    use_batch_norm: True
+
+
+  discriminator_params:
+    layers_structure:
+      - 64
+      - 16
+      - 8
+      - 2
+    activation_fn: "relu"
+    use_batch_norm: True
+    use_mini_batch_discrimination: True
+    layer_index: 2
+    similarity_features: 8
+    kernel_dims: 8
+
+
+
+  projection_params:
+    layers_structure:
+      - 271
+      - 200
+      - 100
+
+  GAN_params:
+    xgenerator_optimizer_name: "adam"
+    ygenerator_optimizer_name: "adam"
+    discriminator_optimizer_name: "adam"
+
+ 
+

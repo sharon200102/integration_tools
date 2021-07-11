@@ -18,8 +18,8 @@ from os.path import join
 
 GROUND_TRUTH = 0
 GENERATED = 1
-
-discriminator_output_size = 2
+XGENERATED = 1
+YGENERATED = 2
 
 
 class IntegrativeGAN(pl.LightningModule):
@@ -33,17 +33,7 @@ class IntegrativeGAN(pl.LightningModule):
                  projection_train_batch_size=10, projection_validation_batch_size=10, results_dir='.',
                  projection_identifier=None):
 
-        """The function doesn't receive the actual generators and discriminator due to the fact that they cannot be
-        saved as hyper parameters """
         super().__init__()
-        # Don't save the projection_model,data because It's not possible to save them properly.
-        not_to_save_args = ['self', 'xgenerator', 'ygenerator', 'discriminator', 'projection_model', 'data']
-        # https://stackoverflow.com/questions/582056/getting-list-of-parameter-names-inside-python-function
-
-        all_init_parameters = self.__init__.__code__.co_varnames[:self.__init__.__code__.co_argcount]
-        hyper_parameters_to_save = [param_to_save for param_to_save in all_init_parameters if
-                                    param_to_save not in not_to_save_args]
-        self.save_hyperparameters(*hyper_parameters_to_save)
         self.projection_model = deepcopy(projection_model)
         self.data = deepcopy(data)
         self.xgenerator = deepcopy(xgenerator)
@@ -53,14 +43,25 @@ class IntegrativeGAN(pl.LightningModule):
         self.xgenerator_optimizer_function = optimizers_dict[xgenerator_optimizer_name]
         self.ygenerator_optimizer_function = optimizers_dict[ygenerator_optimizer_name]
         self.discriminator_optimizer_function = optimizers_dict[discriminator_optimizer_name]
+        self.xgenerator_learning_rate = xgenerator_learning_rate
+        self.ygenerator_learning_rate = ygenerator_learning_rate
+        self.discriminator_learning_rate = discriminator_learning_rate
+        self.train_percent = train_percent
+        self.train_batch_size = train_batch_size
+        self.validation_batch_size = validation_batch_size
+        self.projection_train_percent = projection_train_percent
+        self.projection_train_batch_size = projection_train_batch_size
+        self.projection_validation_batch_size = projection_validation_batch_size
+        self.results_dir = results_dir
+        self.projection_identifier = projection_identifier
 
     def prepare_data(self) -> None:
         projection_model_class_name = type(self.projection_model).__name__
-        model_checkpoints_folder = join(self.hparams.results_dir, '{}_checkpoints'.format(projection_model_class_name),
-                                        self.hparams.projection_identifier) if self.hparams.projection_identifier is not None \
-            else join(self.hparams.results_dir, '{}_checkpoints'.format(projection_model_class_name))
+        model_checkpoints_folder = join(self.results_dir, '{}_checkpoints'.format(projection_model_class_name),
+                                        self.projection_identifier) if self.projection_identifier is not None \
+            else join(self.results_dir, '{}_checkpoints'.format(projection_model_class_name))
 
-        model_logs_folder = join(self.hparams.results_dir, '{}_Logs'.format(projection_model_class_name))
+        model_logs_folder = join(self.results_dir, '{}_Logs'.format(projection_model_class_name))
 
         monitor = None
         callbacks = []
@@ -69,9 +70,9 @@ class IntegrativeGAN(pl.LightningModule):
                                         transform=transforms.Compose([ToTensor(), EntityToTensor()]))
         # Create datamodule specific to the projection module
         dm = data_modules_for_projection_models[projection_model_class_name](xy_dataset,
-                                                                             self.hparams.projection_train_batch_size,
-                                                                             self.hparams.projection_validation_batch_size,
-                                                                             self.hparams.projection_train_percent)
+                                                                             self.projection_train_batch_size,
+                                                                             self.projection_validation_batch_size,
+                                                                             self.projection_train_percent)
         # If the projection model demands an Early stopping callback
         if projection_model_class_name in early_stopping_dict:
             monitor = early_stopping_dict[projection_model_class_name]
@@ -98,29 +99,29 @@ class IntegrativeGAN(pl.LightningModule):
         self.gan_dataset = ConcatDataset(xy_dataset, projected_dataset)
 
     def setup(self, stage: str):
-        train_size = int(self.hparams.train_percent * len(self.gan_dataset))
+        train_size = int(self.train_percent * len(self.gan_dataset))
         validation_size = len(self.gan_dataset) - train_size
         self.gan_train_data, self.gan_validation_data = torch.utils.data.random_split(self.gan_dataset,
                                                                                       [train_size, validation_size])
 
     def train_dataloader(self) -> DataLoader:
         return torch.utils.data.DataLoader(self.gan_train_data, shuffle=True,
-                                           batch_size=self.hparams.train_batch_size, drop_last=True)
+                                           batch_size=self.train_batch_size, drop_last=True)
 
     def val_dataloader(self):
         return torch.utils.data.DataLoader(self.gan_validation_data, shuffle=False,
-                                           batch_size=self.hparams.validation_batch_size)
+                                           batch_size=self.validation_batch_size)
 
     def forward(self, x, y):
         return {'x': self.xgenerator(x), 'y': self.ygenerator(y)}
 
     def configure_optimizers(self):
         return [self.discriminator_optimizer_function(self.discriminator.parameters(),
-                                                      lr=self.hparams.discriminator_learning_rate),
+                                                      lr=self.discriminator_learning_rate),
                 self.xgenerator_optimizer_function(self.xgenerator.parameters(),
-                                                   lr=self.hparams.xgenerator_learning_rate),
+                                                   lr=self.xgenerator_learning_rate),
                 self.ygenerator_optimizer_function(self.ygenerator.parameters(),
-                                                   lr=self.hparams.ygenerator_learning_rate)], []
+                                                   lr=self.ygenerator_learning_rate)], []
 
     def adversarial_loss(self, y_hat, y):
         return self.loss(y_hat, y)
@@ -132,42 +133,45 @@ class IntegrativeGAN(pl.LightningModule):
 
         # train the discriminator
         if optimizer_idx == 0:
-            real_latent_representation_label = torch.full((b_size,), GROUND_TRUTH, dtype=torch.long,requires_grad=False)
+            real_latent_representation_label = torch.full((b_size,), GROUND_TRUTH, dtype=torch.long,
+                                                          requires_grad=False)
             # Forward pass ground_truth batch through D
             err_ground_truth = self.adversarial_loss(self.discriminator(ground_truth_representation.detach()),
                                                      real_latent_representation_label)
 
             # Train discriminator to identify x_generated_representation from ground_truth
-            fake_x_label = torch.full((b_size,), GENERATED, dtype=torch.long,requires_grad=False)
+            fake_x_label = torch.full((b_size,), GENERATED, dtype=torch.long, requires_grad=False)
             err_disc_x_generated_representation = self.adversarial_loss(
                 self.discriminator(self.xgenerator(x).detach()),
                 fake_x_label)
 
             # Train discriminator to identify y_generated_representation from ground_truth
-            fake_y_label = torch.full((b_size,), GENERATED, dtype=torch.long,requires_grad=False)
+            fake_y_label = torch.full((b_size,), GENERATED, dtype=torch.long, requires_grad=False)
             err_disc_y_generated_representation = self.adversarial_loss(
                 self.discriminator(self.ygenerator(y).detach()),
                 fake_y_label)
 
             self.errD = err_ground_truth + err_disc_x_generated_representation + err_disc_y_generated_representation
-            self.log('discriminator_loss', self.errD,prog_bar=True, logger=True)
+            self.log('discriminator_loss', self.errD, prog_bar=True, logger=True)
             return {'loss': self.errD}
 
         # Train the X generator
         if optimizer_idx == 1:
-            real_latent_representation_label = torch.full((b_size,), GROUND_TRUTH, dtype=torch.long,requires_grad=False)
+            real_latent_representation_label = torch.full((b_size,), GROUND_TRUTH, dtype=torch.long,
+                                                          requires_grad=False)
             self.err_gx = self.adversarial_loss(self.discriminator(self.xgenerator(x)),
                                                 real_latent_representation_label)
-            self.log('xgenerator_loss', self.err_gx,prog_bar=True, logger=True)
+            self.log('xgenerator_loss', self.err_gx, prog_bar=True, logger=True)
 
             return {'loss': self.err_gx}
         # Train The Y generator
         if optimizer_idx == 2:
-            real_latent_representation_label = torch.full((b_size,), GROUND_TRUTH, dtype=torch.long,requires_grad=False)
+            real_latent_representation_label = torch.full((b_size,), GROUND_TRUTH, dtype=torch.long,
+                                                          requires_grad=False)
             self.err_gy = self.adversarial_loss(self.discriminator(self.ygenerator(y)),
                                                 real_latent_representation_label)
-            self.log('ygenerator_loss', self.err_gy,prog_bar=True, logger=True)
-            self.log('total_loss', self.err_gx + self.err_gy,prog_bar=True, logger=True)
+            self.log('ygenerator_loss', self.err_gy, prog_bar=True, logger=True)
+            self.log('total_loss', self.err_gx + self.err_gy, prog_bar=True, logger=True)
 
             return {'loss': self.err_gy}
 
@@ -176,7 +180,7 @@ class IntegrativeGAN(pl.LightningModule):
         raw_samples, ground_truth_representation = batch
         x, y = raw_samples['FIELD0'], raw_samples['FIELD1']
         b_size = x.shape[0]
-        real_latent_representation_label = torch.full((b_size,), GROUND_TRUTH, dtype=torch.long,requires_grad=False)
+        real_latent_representation_label = torch.full((b_size,), GROUND_TRUTH, dtype=torch.long, requires_grad=False)
         err_gx = self.adversarial_loss(self.discriminator(self.xgenerator(x)),
                                        real_latent_representation_label)
 
@@ -186,7 +190,7 @@ class IntegrativeGAN(pl.LightningModule):
         return {'loss': err_gx + err_gy}
 
     def validation_epoch_end(self, outputs) -> None:
-        avg_val_loss = torch.tensor([x['loss'] for x in outputs],requires_grad=False).mean()
+        avg_val_loss = torch.tensor([x['loss'] for x in outputs], requires_grad=False).mean()
         self.log('val_loss', avg_val_loss, logger=True, prog_bar=True)
         # log the vla loss with respect to the epoch number
         self.logger.experiment.add_scalar("validation_loss_per_epoch", avg_val_loss, self.current_epoch)
@@ -216,31 +220,10 @@ class IntegrativeGAN(pl.LightningModule):
         self.discriminator.eval()
 
 
-
-
-
-
 class FMIntegrativeGAN(IntegrativeGAN):
-    def __init__(self, xgenerator, ygenerator, discriminator, data: DualDataset,
-                 projection_model, xgenerator_learning_rate=0.001, ygenerator_learning_rate=0.001,
-                 discriminator_learning_rate=0.001,
-                 xgenerator_optimizer_name='adam', ygenerator_optimizer_name='adam',
-                 discriminator_optimizer_name='adam', train_percent=0.8, train_batch_size=10, validation_batch_size=10,
-                 projection_train_percent=0.8,
-                 projection_train_batch_size=10, projection_validation_batch_size=10, results_dir='.',
-                 projection_identifier=None):
+    def __init__(self, *args, **kwargs):
 
-        super(FMIntegrativeGAN, self).__init__(xgenerator, ygenerator, discriminator, data,
-                                               projection_model, xgenerator_learning_rate, ygenerator_learning_rate,
-                                               discriminator_learning_rate,
-                                               xgenerator_optimizer_name, ygenerator_optimizer_name,
-                                               discriminator_optimizer_name, train_percent, train_batch_size,
-                                               validation_batch_size,
-                                               projection_train_percent,
-                                               projection_train_batch_size, projection_validation_batch_size,
-                                               results_dir,
-                                               projection_identifier)
-
+        super(FMIntegrativeGAN, self).__init__(*args, **kwargs)
         self.xgenerator_loss = nn.MSELoss(reduction='sum')
         self.ygenerator_loss = nn.MSELoss(reduction='sum')
 
@@ -251,13 +234,14 @@ class FMIntegrativeGAN(IntegrativeGAN):
 
         # train the discriminator
         if optimizer_idx == 0:
-            real_latent_representation_label = torch.full((b_size,), GROUND_TRUTH, dtype=torch.long,requires_grad=False)
+            real_latent_representation_label = torch.full((b_size,), GROUND_TRUTH, dtype=torch.long,
+                                                          requires_grad=False)
             # Forward pass ground_truth batch through D
             err_ground_truth = self.adversarial_loss(self.discriminator(ground_truth_representation.detach()),
                                                      real_latent_representation_label)
 
             # Train discriminator to identify x_generated_representation from ground_truth
-            fake_x_label = torch.full((b_size,), GENERATED, dtype=torch.long,requires_grad=False)
+            fake_x_label = torch.full((b_size,), GENERATED, dtype=torch.long, requires_grad=False)
             err_disc_x_generated_representation = self.adversarial_loss(
                 self.discriminator(self.xgenerator(x).detach()),
                 fake_x_label)
@@ -320,41 +304,54 @@ class FMIntegrativeGAN(IntegrativeGAN):
 
         return {'loss': err_gx + err_gy}
 
-    """@classmethod
-        def from_configuration_dictionaries(cls, tuned_parameters: dict, fixed_parameters: dict):
-            # Fill tha missing parameters with default values.
-            tuned_parameters = set_default_parameters(tuned_parameters, default_tuned_dict)
-            fixed_parameters = set_default_parameters(fixed_parameters, default_fixed_dict)
 
-            latent_representation_size = tuned_parameters['latent_representation_size']
-            data = load_pickle(fixed_parameters['data_path'])
+class MultiClassGAN(IntegrativeGAN):
+    def training_step(self, batch, batch_idx, optimizer_idx):
+        raw_samples, ground_truth_representation = batch
+        x, y = raw_samples['FIELD0'], raw_samples['FIELD1']
+        b_size = x.shape[0]
 
-            xgenerator_architecture = fixed_parameters['xgenerator_internal_layers_structure'] + [
-                latent_representation_size]
+        # train the discriminator
+        if optimizer_idx == 0:
+            real_latent_representation_label = torch.full((b_size,), GROUND_TRUTH, dtype=torch.long,
+                                                          requires_grad=False)
+            # Forward pass ground_truth batch through D
+            err_ground_truth = self.adversarial_loss(self.discriminator(ground_truth_representation.detach()),
+                                                     real_latent_representation_label)
 
-            ygenerator_architecture = fixed_parameters['ygenerator_internal_layers_structure'] + [
-                latent_representation_size]
+            # Train discriminator to identify x_generated_representation from ground_truth
+            fake_x_label = torch.full((b_size,), XGENERATED, dtype=torch.long, requires_grad=False)
+            err_disc_x_generated_representation = self.adversarial_loss(
+                self.discriminator(self.xgenerator(x).detach()),
+                fake_x_label)
 
-            discriminator_architecture = [latent_representation_size] + fixed_parameters[
-                'discriminator_internal_layers_structure'] + [discriminator_output_size]
+            # Train discriminator to identify y_generated_representation from ground_truth
+            fake_y_label = torch.full((b_size,), YGENERATED, dtype=torch.long, requires_grad=False)
+            err_disc_y_generated_representation = self.adversarial_loss(
+                self.discriminator(self.ygenerator(y).detach()),
+                fake_y_label)
 
-            projection_model_architecture = fixed_parameters['projector_internal_layers_structure'] + [
-                latent_representation_size]
-            projection_model = StandardVAE_pl(projection_model_architecture,
-                                              fixed_parameters['projector_activation_function_name'],
-                                              tuned_parameters['projector_klb_coefficient'],
-                                              tuned_parameters['projector_learning_rate'],
-                                              fixed_parameters['projector_optimizer_name'])
+            self.errD = err_ground_truth + err_disc_x_generated_representation + err_disc_y_generated_representation
+            self.log('discriminator_loss', self.errD, prog_bar=True, logger=True)
+            return {'loss': self.errD}
 
-            return cls(xgenerator_architecture, ygenerator_architecture, discriminator_architecture,
-                       fixed_parameters['xgenerator_activation_function_name'],
-                       fixed_parameters['ygenerator_activation_function_name']
-                       , fixed_parameters['discriminator_activation_function_name'], data, projection_model,
-                       tuned_parameters['xgenerator_learning_rate'],
-                       tuned_parameters['ygenerator_learning_rate'], tuned_parameters['discriminator_learning_rate'],
-                       fixed_parameters['xgenertor_optimizer_name'], fixed_parameters['ygenertor_optimizer_name'],
-                       fixed_parameters['discriminator_optimizer_name'], fixed_parameters['train_percent'],
-                       tuned_parameters['train_batch_size'], fixed_parameters['validation_batch_size'],
-                       fixed_parameters['projection_train_percent'], fixed_parameters['projection_train_batch_size'],
-                       fixed_parameters['projection_validation_batch_size'])
-    """
+        # Train the X generator
+        if optimizer_idx == 1:
+            real_latent_representation_label = torch.full((b_size,), GROUND_TRUTH, dtype=torch.long,
+                                                          requires_grad=False)
+            self.err_gx = self.adversarial_loss(self.discriminator(self.xgenerator(x)),
+                                                real_latent_representation_label)
+            self.log('xgenerator_loss', self.err_gx, prog_bar=True, logger=True)
+
+            return {'loss': self.err_gx}
+        # Train The Y generator
+        if optimizer_idx == 2:
+            real_latent_representation_label = torch.full((b_size,), GROUND_TRUTH, dtype=torch.long,
+                                                          requires_grad=False)
+            self.err_gy = self.adversarial_loss(self.discriminator(self.ygenerator(y)),
+                                                real_latent_representation_label)
+            self.log('ygenerator_loss', self.err_gy, prog_bar=True, logger=True)
+            self.log('total_loss', self.err_gx + self.err_gy, prog_bar=True, logger=True)
+
+            return {'loss': self.err_gy}
+

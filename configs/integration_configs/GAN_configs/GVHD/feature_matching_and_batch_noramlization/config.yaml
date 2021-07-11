@@ -1,0 +1,16 @@
+authorName: Sharon Komissarov
+experimentName: GVHD_GAN_integration_feature_mathching_and_batch_noramlization
+trialConcurrency: 1
+maxExecDuration: 5h
+maxTrialNum: 500
+trainingServicePlatform: local
+# The path to Search Space
+searchSpacePath: search_space.json
+useAnnotation: false
+tuner:
+  builtinTunerName: Random
+  # The path and the running command of trial
+trial:
+  command: python3 /home/sharon200102/Documents/second_degree/Research/integration_tools/GAN_runner.py --c /home/sharon200102/Documents/second_degree/Research/integration_tools/configs/integration_configs/GAN_configs/GVHD/feature_matching_and_batch_noramlization/params.yaml -n
+  codeDir: /home/sharon200102/Documents/second_degree/Research/integration_tools
+  gpuNum: 0
